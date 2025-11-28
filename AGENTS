@@ -1,0 +1,34 @@
+# AGENTS
+
+This file serves as a context guide for AI agents working on the Sudoku Game project.
+
+## Project Overview
+**Name:** Sudoku Game (Brutalist Edition)
+**Platform:** iOS (primary), Android (optional)
+**Stack:** Expo (React Native), TypeScript, React Native Skia, Reanimated, Moti.
+**Design:** Brutalist, Black & White, Offline-first.
+
+## Core Principles
+1. **Offline-First:** No internet dependency for core gameplay. JSON-based puzzles.
+2. **Performance:** 60fps animations via Skia and Reanimated.
+3. **Aesthetics:** Strict brutalist design. High contrast. No default UI elements.
+4. **Monetization:** AdMob (Rewarded, Interstitial, Banner) + RevenueCat (Ad-Free Subscription).
+
+## Tech Stack Details
+- **Framework:** Expo (Managed Workflow)
+- **Graphics:** @shopify/react-native-skia (Canvas rendering for board, notes, effects)
+- **Animations:** react-native-reanimated, moti
+- **Navigation:** expo-router (preferred) or react-navigation
+- **Storage:** expo-secure-store (Identity), @react-native-async-storage/async-storage (Game Data)
+- **Ads:** react-native-google-mobile-ads
+- **IAP:** react-native-purchases (RevenueCat)
+
+## Key Directories (Planned)
+- `/src/components`: UI components (BrutalistButton, NumberPad, etc.)
+- `/src/game`: Game logic (Sudoku engine, generator, validator)
+- `/src/screens`: App screens
+- `/src/assets`: Fonts, JSON puzzles
+- `/src/context`: State management (GameContext, ThemeContext)
+
+## Agent Persona
+You are a senior React Native engineer with a focus on high-performance graphics and strict design implementation. You prioritize code cleanliness, type safety (TypeScript), and smooth animations.
