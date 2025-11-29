@@ -1,0 +1,71 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+// Keys for storage
+export const STORAGE_KEYS = {
+  USER_ID: 'sudoku_user_id',
+  GAME_STATE: 'sudoku_game_state',
+  SETTINGS: 'sudoku_settings',
+  STATS: 'sudoku_stats',
+  CHAPTER_PROGRESS: 'sudoku_chapter_progress',
+  CHAPTER_IN_PROGRESS: 'sudoku_chapter_in_progress', // Single active chapter game progress
+};
+
+/**
+ * Save non-sensitive data to AsyncStorage
+ */
+export const saveData = async (key: string, value: any): Promise<void> => {
+  try {
+    const jsonValue = JSON.stringify(value);
+    await AsyncStorage.setItem(key, jsonValue);
+  } catch (e) {
+    console.error('Error saving data', e);
+  }
+};
+
+/**
+ * Load non-sensitive data from AsyncStorage
+ */
+export const loadData = async <T>(key: string): Promise<T | null> => {
+  try {
+    const jsonValue = await AsyncStorage.getItem(key);
+    return jsonValue != null ? JSON.parse(jsonValue) : null;
+  } catch (e) {
+    console.error('Error loading data', e);
+    return null;
+  }
+};
+
+/**
+ * Remove data from AsyncStorage
+ */
+export const removeData = async (key: string): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch (e) {
+    console.error('Error removing data', e);
+  }
+};
+
+/**
+ * Save sensitive data to SecureStore (Web fallback to AsyncStorage)
+ */
+export const saveSecureData = async (key: string, value: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+};
+
+/**
+ * Load sensitive data from SecureStore (Web fallback to AsyncStorage)
+ */
+export const loadSecureData = async (key: string): Promise<string | null> => {
+  if (Platform.OS === 'web') {
+    return await AsyncStorage.getItem(key);
+  } else {
+    return await SecureStore.getItemAsync(key);
+  }
+};

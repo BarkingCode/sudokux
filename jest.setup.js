@@ -1,0 +1,213 @@
+/**
+ * Jest setup file for SudokuX tests.
+ * Contains all necessary mocks for native modules and external services.
+ */
+
+// Mock AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
+// Mock expo-secure-store
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(() => Promise.resolve(null)),
+  setItemAsync: jest.fn(() => Promise.resolve()),
+  deleteItemAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock expo-haptics
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(() => Promise.resolve()),
+  notificationAsync: jest.fn(() => Promise.resolve()),
+  selectionAsync: jest.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy',
+  },
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error',
+  },
+}));
+
+// Mock expo-notifications
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  setNotificationHandler: jest.fn(),
+  scheduleNotificationAsync: jest.fn(() => Promise.resolve('notification-id')),
+  cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+  setBadgeCountAsync: jest.fn(() => Promise.resolve()),
+  getBadgeCountAsync: jest.fn(() => Promise.resolve(0)),
+}));
+
+// Mock expo-device
+jest.mock('expo-device', () => ({
+  isDevice: true,
+  brand: 'Apple',
+  manufacturer: 'Apple',
+  modelName: 'iPhone',
+  osName: 'iOS',
+  osVersion: '17.0',
+}));
+
+// Mock React Native Skia (native module)
+jest.mock('@shopify/react-native-skia', () => ({
+  Canvas: 'Canvas',
+  Skia: {
+    Paint: jest.fn(() => ({
+      setColor: jest.fn(),
+      setStrokeWidth: jest.fn(),
+      setStyle: jest.fn(),
+    })),
+    Path: jest.fn(() => ({
+      moveTo: jest.fn(),
+      lineTo: jest.fn(),
+      close: jest.fn(),
+    })),
+    Color: jest.fn((color) => color),
+  },
+  useFont: jest.fn(() => null),
+  useFonts: jest.fn(() => null),
+  matchFont: jest.fn(() => null),
+  Group: 'Group',
+  Rect: 'Rect',
+  RoundedRect: 'RoundedRect',
+  Line: 'Line',
+  Text: 'Text',
+  Circle: 'Circle',
+  Path: 'Path',
+  Fill: 'Fill',
+  useValue: jest.fn(() => ({ current: 0 })),
+  useTiming: jest.fn(() => ({ current: 0 })),
+}));
+
+// Mock react-native-game-center
+jest.mock('react-native-game-center', () => ({
+  authenticate: jest.fn(() => Promise.resolve({ isAuthenticated: false })),
+  submitScore: jest.fn(() => Promise.resolve()),
+  unlockAchievement: jest.fn(() => Promise.resolve()),
+  showLeaderboard: jest.fn(() => Promise.resolve()),
+  showAchievements: jest.fn(() => Promise.resolve()),
+  getPlayerId: jest.fn(() => Promise.resolve(null)),
+}));
+
+// Mock react-native-google-mobile-ads
+jest.mock('react-native-google-mobile-ads', () => ({
+  MobileAds: jest.fn(() => ({
+    initialize: jest.fn(() => Promise.resolve()),
+  })),
+  RewardedAd: {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(() => Promise.resolve()),
+      addAdEventListener: jest.fn(() => jest.fn()),
+    })),
+  },
+  InterstitialAd: {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(() => Promise.resolve()),
+      addAdEventListener: jest.fn(() => jest.fn()),
+    })),
+  },
+  BannerAd: 'BannerAd',
+  BannerAdSize: {
+    BANNER: 'BANNER',
+    LARGE_BANNER: 'LARGE_BANNER',
+    MEDIUM_RECTANGLE: 'MEDIUM_RECTANGLE',
+  },
+  AdEventType: {
+    LOADED: 'loaded',
+    ERROR: 'error',
+    CLOSED: 'closed',
+  },
+  RewardedAdEventType: {
+    LOADED: 'loaded',
+    EARNED_REWARD: 'earned_reward',
+  },
+  TestIds: {
+    BANNER: 'ca-app-pub-3940256099942544/6300978111',
+    INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
+    REWARDED: 'ca-app-pub-3940256099942544/5224354917',
+  },
+}));
+
+// Mock Supabase client
+jest.mock('./src/lib/supabase', () => ({
+  supabase: {
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      gt: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      single: jest.fn(() => Promise.resolve({ data: null, error: null })),
+      maybeSingle: jest.fn(() => Promise.resolve({ data: null, error: null })),
+    })),
+    auth: {
+      getSession: jest.fn(() => Promise.resolve({ data: { session: null }, error: null })),
+      signIn: jest.fn(() => Promise.resolve({ data: null, error: null })),
+      signOut: jest.fn(() => Promise.resolve({ error: null })),
+    },
+  },
+}));
+
+// Mock expo-router
+jest.mock('expo-router', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+  })),
+  useLocalSearchParams: jest.fn(() => ({})),
+  usePathname: jest.fn(() => '/'),
+  Link: 'Link',
+  Stack: {
+    Screen: 'Screen',
+  },
+}));
+
+// Mock react-native-reanimated
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
+
+// Mock moti
+jest.mock('moti', () => ({
+  MotiView: 'MotiView',
+  MotiText: 'MotiText',
+  MotiPressable: 'MotiPressable',
+  useAnimationState: jest.fn(() => ({
+    current: 'default',
+    transitionTo: jest.fn(),
+  })),
+  AnimatePresence: ({ children }) => children,
+}));
+
+// Silence console warnings during tests
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('Animated') || args[0].includes('componentWillReceiveProps'))
+  ) {
+    return;
+  }
+  originalWarn.apply(console, args);
+};
+
+// Global test timeout
+jest.setTimeout(30000);
