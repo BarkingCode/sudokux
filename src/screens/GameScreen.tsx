@@ -1,9 +1,9 @@
 /**
  * Main game screen for playing Sudoku.
- * Supports both 6x6 and 9x9 grid variants.
+ * Orchestrates game components, handles navigation, and manages game modes.
  */
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator, AppState, AppStateStatus, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -12,31 +12,20 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { useTheme } from '../context/ThemeContext';
-import { useGame, SmartHint } from '../context/GameContext';
+import { useGame } from '../context/GameContext';
 import { useAds } from '../context/AdContext';
 import { AD_UNIT_IDS } from '../config/ads';
 import { chapterService } from '../services/chapterService';
-import { SudokuBoard } from '../components/board/SudokuBoard';
-import { NumberPad } from '../components/NumberPad';
+import { getChapterPuzzle } from '../game/chapterPuzzles';
+import { statsService } from '../services/statsService';
+import { checkAchievements, onChapterComplete } from '../services/achievementService';
 import { BrutalistText } from '../components/BrutalistText';
-import { BrutalistButton } from '../components/BrutalistButton';
-import { DailyCompletionModal } from '../components/DailyCompletionModal';
-import { ChapterCompletionModal } from '../components/ChapterCompletionModal';
-import { FreeRunCompletionModal } from '../components/FreeRunCompletionModal';
-import { SmartHintModal } from '../components/SmartHintModal';
-import { GRID_CONFIGS } from '../game/types';
-import { Difficulty } from '../context/GameContext';
-import { loadData, saveData, loadSecureData, STORAGE_KEYS } from '../utils/storage';
-
-// Get difficulty for a specific puzzle number (matching ChaptersScreen logic)
-const getPuzzleDifficulty = (puzzleNum: number): Difficulty => {
-  if (puzzleNum <= 20) return 'easy';
-  if (puzzleNum <= 40) return 'medium';
-  if (puzzleNum <= 60) return 'hard';
-  if (puzzleNum <= 80) return 'extreme';
-  if (puzzleNum <= 100) return 'insane';
-  return 'inhuman';
-};
+import { SudokuBoard } from '../components/board/SudokuBoard';
+import { GamePlayArea } from '../components/game/GamePlayArea';
+import { ViewOnlyStats } from '../components/game/ViewOnlyStats';
+import { GameModalsManager } from '../components/game/GameModalsManager';
+import { useGameModals, useUserId, useGameCompletion, getPuzzleDifficulty } from '../hooks';
+import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
 
 interface GameProgress {
   currentPuzzle: number;
@@ -44,11 +33,36 @@ interface GameProgress {
   chapterGamesCompleted: number;
 }
 
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export default function GameScreen() {
   const { colors, isDark } = useTheme();
-  const { gameState, startNewGame, updateCell, addNote, removeNote, pauseGame, resumeGame, getSmartHint, applyHint, devAutoComplete, saveChapterProgress, clearChapterProgress } = useGame();
+  const {
+    gameState,
+    startNewGame,
+    loadSavedPuzzle,
+    updateCell,
+    addNote,
+    removeNote,
+    pauseGame,
+    resumeGame,
+    getSmartHint,
+    applyHint,
+    devAutoComplete,
+    saveChapterProgress,
+    clearChapterProgress,
+    incrementMistakes,
+  } = useGame();
   const { onPuzzleComplete, isAdFree } = useAds();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const modals = useGameModals();
+
+  // Route params
   const params = useLocalSearchParams<{
     isDaily?: string;
     challengeId?: string;
@@ -61,21 +75,8 @@ export default function GameScreen() {
     completionMistakes?: string;
     completionRank?: string;
   }>();
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
-  const [notesMode, setNotesMode] = useState(false);
-  const [showDailyModal, setShowDailyModal] = useState(false);
-  const [showChapterModal, setShowChapterModal] = useState(false);
-  const [showFreeRunModal, setShowFreeRunModal] = useState(false);
-  const [showHintModal, setShowHintModal] = useState(false);
-  const [currentHint, setCurrentHint] = useState<SmartHint | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [mistakesCount, setMistakesCount] = useState(0);
-  const router = useRouter();
-  const hasShownCompletionAd = useRef(false);
-  const hasShownDailyModal = useRef(false);
-  const hasShownChapterModal = useRef(false);
-  const hasShownFreeRunModal = useRef(false);
 
+  // Parse route params
   const isDaily = params.isDaily === 'true';
   const isChapter = params.isChapter === 'true';
   const isViewOnly = params.viewOnly === 'true';
@@ -84,99 +85,61 @@ export default function GameScreen() {
   const challengeDate = params.challengeDate || '';
   const initialChapterGamesCompleted = parseInt(params.chapterGamesCompleted || '0', 10);
 
-  // View-only mode stats (for completed daily puzzles)
+  // View-only mode stats
   const completionTime = params.completionTime ? parseInt(params.completionTime, 10) : 0;
   const completionMistakes = params.completionMistakes ? parseInt(params.completionMistakes, 10) : 0;
   const completionRank = params.completionRank ? parseInt(params.completionRank, 10) : null;
 
-  // Track chapter games completed for interstitial ads (persists across puzzles in session)
+  // Local state
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
+  const [notesMode, setNotesMode] = useState(false);
   const [chapterGamesCount, setChapterGamesCount] = useState(initialChapterGamesCompleted);
 
-  // Load user ID on mount (from SecureStore where identity is saved)
-  // Note: We use identity.id (internal_id) because chapterService looks up users by internal_id
-  useEffect(() => {
-    loadSecureData(STORAGE_KEYS.USER_ID).then((storedData) => {
-      if (storedData) {
-        try {
-          const identity = JSON.parse(storedData);
-          // Use internal_id (identity.id) for chapterService lookups
-          setUserId(identity?.id || null);
-        } catch {
-          setUserId(null);
-        }
-      }
-    });
-  }, []);
+  // Ref to access current gameState in cleanup without causing re-renders
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
 
-  // Get grid configuration for current game
-  const gridConfig = useMemo(() => {
-    const gridType = gameState?.gridType || '9x9';
-    return GRID_CONFIGS[gridType];
-  }, [gameState?.gridType]);
+  // Load user IDs:
+  // - internalUserId: for chapter service (looks up by internal_id)
+  // - supabaseUserId: for daily completions (foreign key to users.id)
+  const { userId: internalUserId } = useUserId({ useInternalId: true });
+  const { userId: supabaseUserId } = useUserId({ useInternalId: false });
 
+  // Handle completion modal triggering
+  useGameCompletion({
+    gameState,
+    modals,
+    isDaily,
+    isChapter,
+    isViewOnly,
+  });
+
+  // Start new game if none exists
   useEffect(() => {
     if (!gameState) {
       startNewGame('easy');
     }
   }, []);
 
-  // Show completion modal when puzzle is completed (skip for view-only mode)
-  useEffect(() => {
-    if (isViewOnly) return; // Don't show modals in view-only mode
-
-    if (gameState?.isComplete && !hasShownCompletionAd.current) {
-      hasShownCompletionAd.current = true;
-
-      if (isDaily && !hasShownDailyModal.current) {
-        // For daily challenges, show the completion modal
-        hasShownDailyModal.current = true;
-        const timer = setTimeout(() => {
-          setShowDailyModal(true);
-        }, 1000);
-        return () => clearTimeout(timer);
-      } else if (isChapter && !hasShownChapterModal.current) {
-        // For chapter games, show the chapter completion modal
-        hasShownChapterModal.current = true;
-        const timer = setTimeout(() => {
-          setShowChapterModal(true);
-        }, 800);
-        return () => clearTimeout(timer);
-      } else if (!hasShownFreeRunModal.current) {
-        // For free run games, show the free run completion modal
-        hasShownFreeRunModal.current = true;
-        const timer = setTimeout(() => {
-          setShowFreeRunModal(true);
-        }, 800);
-        return () => clearTimeout(timer);
-      }
-    }
-
-    // Reset flags when starting a new game
-    if (!gameState?.isComplete) {
-      hasShownCompletionAd.current = false;
-      hasShownDailyModal.current = false;
-      hasShownChapterModal.current = false;
-      hasShownFreeRunModal.current = false;
-    }
-  }, [gameState?.isComplete, isDaily, isChapter]);
+  // Determine if this is a Free Run game (not daily, not chapter)
+  const isFreeRun = !isDaily && !isChapter;
 
   // Pause/resume timer when screen gains/loses focus
-  // Also save chapter progress when leaving screen
   useFocusEffect(
     useCallback(() => {
-      // Screen is focused - resume timer
       resumeGame();
-
       return () => {
-        // Screen is unfocused - pause timer
         pauseGame();
-
-        // Save chapter progress if game is in progress (not complete, not view-only)
-        if (isChapter && !gameState?.isComplete && !isViewOnly) {
+        const currentGameState = gameStateRef.current;
+        if (isChapter && !currentGameState?.isComplete && !isViewOnly) {
           saveChapterProgress(puzzleNumber);
         }
+        // Save Free Run progress when leaving screen
+        if (isFreeRun && currentGameState && !currentGameState.isComplete && !isViewOnly) {
+          saveData(STORAGE_KEYS.FREERUN_GAME_STATE, currentGameState);
+        }
       };
-    }, [pauseGame, resumeGame, isChapter, isViewOnly, gameState?.isComplete, puzzleNumber, saveChapterProgress])
+    }, [pauseGame, resumeGame, isChapter, isFreeRun, isViewOnly, puzzleNumber, saveChapterProgress])
   );
 
   // Pause/resume timer when app goes to background/foreground
@@ -190,28 +153,23 @@ export default function GameScreen() {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [pauseGame, resumeGame]);
 
+  // Cell press handler
   const handleCellPress = useCallback((row: number, col: number) => {
-    Haptics.selectionAsync();
     setSelectedCell({ row, col });
   }, []);
 
+  // Number press handler
   const handleNumberPress = useCallback((num: number) => {
     if (selectedCell && gameState && !gameState.isLoading) {
       const { row, col } = selectedCell;
-      // Can't modify initial cells
       if (gameState.initialGrid[row][col] !== 0) return;
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       if (notesMode) {
-        // In notes mode: toggle note on/off
-        // Only add notes to empty cells
         if (gameState.grid[row][col] === 0) {
           const key = `${row}-${col}`;
           const currentNotes = gameState.notes[key] || [];
@@ -222,16 +180,15 @@ export default function GameScreen() {
           }
         }
       } else {
-        // Normal mode: place number
-        // Check if this is a mistake before updating
         if (num !== 0 && gameState.solution[row][col] !== num) {
-          setMistakesCount((prev) => prev + 1);
+          incrementMistakes();
         }
         updateCell(row, col, num);
       }
     }
-  }, [selectedCell, gameState, updateCell, addNote, removeNote, notesMode]);
+  }, [selectedCell, gameState, updateCell, addNote, removeNote, notesMode, incrementMistakes]);
 
+  // Erase handler
   const handleErase = useCallback(() => {
     if (selectedCell && gameState && !gameState.isLoading) {
       if (gameState.initialGrid[selectedCell.row][selectedCell.col] === 0) {
@@ -241,67 +198,100 @@ export default function GameScreen() {
     }
   }, [selectedCell, gameState, updateCell]);
 
+  // Toggle notes mode
   const toggleNotesMode = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setNotesMode((prev) => !prev);
   }, []);
 
+  // Hint handler
   const handleHint = useCallback(() => {
     const hint = getSmartHint();
     if (hint) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setCurrentHint(hint);
-      setShowHintModal(true);
-      // Highlight the hint cell
+      modals.openHintModal(hint);
       setSelectedCell({ row: hint.cell.row, col: hint.cell.col });
     }
-  }, [getSmartHint]);
+  }, [getSmartHint, modals]);
 
+  // Apply hint handler
   const handleApplyHint = useCallback(() => {
-    if (currentHint) {
-      applyHint(currentHint);
-      setSelectedCell({ row: currentHint.cell.row, col: currentHint.cell.col });
+    if (modals.currentHint) {
+      applyHint(modals.currentHint);
+      setSelectedCell({ row: modals.currentHint.cell.row, col: modals.currentHint.cell.col });
     }
-  }, [currentHint, applyHint]);
+  }, [modals.currentHint, applyHint]);
 
-  // Save chapter completion to Supabase (for replay feature)
+  // Save chapter completion to Supabase
   const saveChapterCompletion = useCallback(async () => {
-    if (!isChapter || !gameState || !userId) return;
+    if (!isChapter || !gameState || !internalUserId) return;
 
     try {
-      await chapterService.saveCompletion(userId, {
+      await chapterService.saveCompletion(internalUserId, {
         puzzleNumber,
         difficulty: gameState.difficulty,
         puzzleGrid: gameState.initialGrid,
         solutionGrid: gameState.solution,
         timeSeconds: gameState.timer || 0,
-        mistakes: mistakesCount,
+        mistakes: gameState.mistakes,
         hintsUsed: gameState.hintsUsed || 0,
       });
-      console.log('[GameScreen] Chapter completion saved for puzzle', puzzleNumber);
+
+      // Check and unlock achievements after chapter completion
+      if (supabaseUserId) {
+        await checkAchievements(supabaseUserId, {
+          difficulty: gameState.difficulty,
+          timeSeconds: gameState.timer || 0,
+          mistakes: gameState.mistakes,
+          hintsUsed: gameState.hintsUsed || 0,
+        });
+        // Also unlock the chapter_complete achievement
+        await onChapterComplete(supabaseUserId);
+      }
+      console.log('[GameScreen] Saved chapter completion and checked achievements');
     } catch (error) {
       console.error('[GameScreen] Failed to save chapter completion:', error);
     }
-  }, [isChapter, gameState, userId, puzzleNumber, mistakesCount]);
+  }, [isChapter, gameState, internalUserId, supabaseUserId, puzzleNumber]);
 
-  // Handle continuing to next puzzle in chapter mode
-  // Save progress, show ad every 3 games, then start the next puzzle directly
+  // Save free run completion to game_sessions table
+  const saveFreeRunCompletion = useCallback(async () => {
+    if (!isFreeRun || !gameState || !supabaseUserId || !gameState.isComplete) return;
+
+    try {
+      await statsService.recordGame(supabaseUserId, {
+        puzzleId: gameState.puzzleId || `freerun-${Date.now()}`,
+        difficulty: gameState.difficulty,
+        timeSeconds: gameState.timer || 0,
+        mistakes: gameState.mistakes,
+        hintsUsed: gameState.hintsUsed || 0,
+        completed: true,
+      });
+
+      // Check and unlock achievements after free run completion
+      await checkAchievements(supabaseUserId, {
+        difficulty: gameState.difficulty,
+        timeSeconds: gameState.timer || 0,
+        mistakes: gameState.mistakes,
+        hintsUsed: gameState.hintsUsed || 0,
+      });
+      console.log('[GameScreen] Saved free run completion and checked achievements');
+    } catch (error) {
+      console.error('[GameScreen] Failed to save free run completion:', error);
+    }
+  }, [isFreeRun, gameState, supabaseUserId]);
+
+  // Handle next puzzle in chapter mode
   const handleNextPuzzle = useCallback(async () => {
     if (!isChapter) return;
 
     const nextPuzzle = puzzleNumber + 1;
     const nextDifficulty = getPuzzleDifficulty(nextPuzzle);
-
-    // Increment games completed
     const newGamesCount = chapterGamesCount + 1;
 
-    // Save chapter completion to Supabase (async, don't wait)
     saveChapterCompletion();
-
-    // Clear in-progress save since puzzle is complete
     clearChapterProgress();
 
-    // Update progress in storage
     const currentProgress = await loadData<GameProgress>(STORAGE_KEYS.CHAPTER_PROGRESS);
     if (currentProgress) {
       const completedPuzzles = currentProgress.completedPuzzles.includes(puzzleNumber)
@@ -316,42 +306,39 @@ export default function GameScreen() {
       });
     }
 
-    // Update local state
     setChapterGamesCount(newGamesCount);
 
-    // Show ad and wait for it to complete
-    // AdContext handles the frequency - resolves immediately if no ad to show
     try {
       await onPuzzleComplete();
     } catch (err) {
       console.log('[GameScreen] Ad error:', err);
     }
 
-    // Close modal and start new game AFTER ad completes
-    setShowChapterModal(false);
-    startNewGame(nextDifficulty, '9x9');
-    setMistakesCount(0);
+    modals.closeChapterModal();
 
-    // Update the route params for the new puzzle number and games count
+    // Load the next chapter puzzle (deterministic based on puzzle number)
+    const nextChapterPuzzle = getChapterPuzzle(nextPuzzle, '9x9');
+    loadSavedPuzzle({
+      puzzleId: `chapter-${nextPuzzle}`,
+      difficulty: nextChapterPuzzle.difficulty,
+      gridType: '9x9',
+      puzzle: nextChapterPuzzle.puzzle,
+      solution: nextChapterPuzzle.solution,
+    });
+
     router.setParams({
       puzzleNumber: nextPuzzle.toString(),
       chapterGamesCompleted: newGamesCount.toString(),
     });
-  }, [isChapter, puzzleNumber, chapterGamesCount, router, onPuzzleComplete, startNewGame, saveChapterCompletion, clearChapterProgress]);
+  }, [isChapter, puzzleNumber, chapterGamesCount, router, onPuzzleComplete, loadSavedPuzzle, saveChapterCompletion, clearChapterProgress, modals]);
 
-  // Handle going back to chapters screen
+  // Handle back to chapters
   const handleBackToChapters = useCallback(async () => {
     if (isChapter) {
-      // Increment games count (puzzle completed)
       const newGamesCount = chapterGamesCount + 1;
-
-      // Save chapter completion to Supabase (async, don't wait)
       saveChapterCompletion();
-
-      // Clear in-progress save since puzzle is complete
       clearChapterProgress();
 
-      // Update progress before leaving
       const currentProgress = await loadData<GameProgress>(STORAGE_KEYS.CHAPTER_PROGRESS);
       if (currentProgress) {
         const completedPuzzles = currentProgress.completedPuzzles.includes(puzzleNumber)
@@ -366,59 +353,42 @@ export default function GameScreen() {
         });
       }
 
-      // Count towards ad frequency (same as Continue path)
-      // This ensures both "Continue" and "Back to Chapters" count towards the 3-game ad logic
       try {
         await onPuzzleComplete();
       } catch (err) {
         console.log('[GameScreen] Ad error:', err);
       }
     }
-    setShowChapterModal(false);
+    modals.closeChapterModal();
     router.back();
-  }, [isChapter, puzzleNumber, chapterGamesCount, router, saveChapterCompletion, onPuzzleComplete, clearChapterProgress]);
+  }, [isChapter, puzzleNumber, chapterGamesCount, router, saveChapterCompletion, onPuzzleComplete, clearChapterProgress, modals]);
 
-  // Handle playing again in free run mode - starts a new game with same settings
-  // Note: Free Run uses session limits (rewarded ads), NOT interstitials
-  const handleFreeRunPlayAgain = useCallback(() => {
+  // Handle free run play again
+  const handleFreeRunPlayAgain = useCallback(async () => {
     if (!gameState) return;
-
-    // Start a new game with the same difficulty and grid type
+    // Record the completed game to game_sessions
+    await saveFreeRunCompletion();
+    // Clear saved Free Run state since we're starting fresh
+    await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
     startNewGame(gameState.difficulty, gameState.gridType);
-    setShowFreeRunModal(false);
-    setMistakesCount(0);
-  }, [gameState, startNewGame]);
+    modals.closeFreeRunModal();
+  }, [gameState, startNewGame, modals, saveFreeRunCompletion]);
 
-  // Handle going back to free run screen
-  // Note: Free Run uses session limits (rewarded ads), NOT interstitials
-  const handleBackToFreeRun = useCallback(() => {
-    setShowFreeRunModal(false);
+  // Handle back to free run
+  const handleBackToFreeRun = useCallback(async () => {
+    // Record the completed game to game_sessions
+    await saveFreeRunCompletion();
+    // Clear saved Free Run state since game is complete
+    await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
+    modals.closeFreeRunModal();
     router.back();
-  }, [router]);
+  }, [router, modals, saveFreeRunCompletion]);
 
-  // Calculate remaining counts based on grid size
-  const remainingCounts = useMemo(() => {
-    if (!gameState || gameState.isLoading) return undefined;
-    const { gridSize, maxNumber } = gridConfig;
-    const counts: Record<number, number> = {};
-
-    for (let n = 1; n <= maxNumber; n++) {
-      let count = gridSize; // Each number appears gridSize times in a complete puzzle
-      for (let r = 0; r < gridSize; r++) {
-        for (let c = 0; c < gridSize; c++) {
-          if (gameState.grid[r][c] === n) count--;
-        }
-      }
-      counts[n] = count;
-    }
-    return counts;
-  }, [gameState?.grid, gameState?.isLoading, gridConfig]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Handle daily modal close
+  const handleDailyModalClose = useCallback(() => {
+    modals.closeDailyModal();
+    router.back();
+  }, [modals, router]);
 
   // Show loading state
   if (!gameState || gameState.isLoading) {
@@ -434,12 +404,10 @@ export default function GameScreen() {
     );
   }
 
-  // Display grid type in header for mini sudoku
   const difficultyLabel = gameState.gridType === '6x6'
     ? `Mini · ${gameState.difficulty}`
     : gameState.difficulty;
 
-  // Show banner only when not ad-free and not on web
   const showBanner = !isAdFree && Platform.OS !== 'web';
 
   return (
@@ -455,7 +423,7 @@ export default function GameScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            if (!isViewOnly) pauseGame(); // Only pause if not view-only
+            if (!isViewOnly) pauseGame();
             router.back();
           }}
           style={[styles.backButton, { borderColor: colors.primary }]}
@@ -475,14 +443,7 @@ export default function GameScreen() {
               {formatTime(completionTime)}
             </BrutalistText>
           ) : (
-            <Pressable
-              onPress={() => {
-                // DEV: Triple-tap on timer to auto-complete (hidden feature)
-                if (__DEV__) {
-                  devAutoComplete();
-                }
-              }}
-            >
+            <Pressable onPress={() => __DEV__ && devAutoComplete()}>
               <BrutalistText size={16} mono bold>
                 {formatTime(gameState.timer || 0)}
               </BrutalistText>
@@ -491,162 +452,83 @@ export default function GameScreen() {
         </View>
       </Animated.View>
 
-      {/* Board */}
-      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.boardContainer}>
-        <SudokuBoard
-          selectedCell={isViewOnly ? null : selectedCell}
-          onCellPress={isViewOnly ? () => {} : handleCellPress}
-        />
-      </Animated.View>
-
       {isViewOnly ? (
-        /* View-Only Stats Display */
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.viewOnlyStats}>
-          <View style={[styles.viewOnlyStatsRow, { borderColor: colors.muted }]}>
-            <View style={styles.viewOnlyStat}>
-              <BrutalistText size={11} mono uppercase muted>
-                Time
-              </BrutalistText>
-              <BrutalistText size={24} bold mono>
-                {formatTime(completionTime)}
-              </BrutalistText>
-            </View>
-
-            {completionRank && (
-              <View style={styles.viewOnlyStat}>
-                <BrutalistText size={11} mono uppercase muted>
-                  Rank
-                </BrutalistText>
-                <BrutalistText size={24} bold>
-                  #{completionRank}
-                </BrutalistText>
-              </View>
-            )}
-
-            <View style={styles.viewOnlyStat}>
-              <BrutalistText size={11} mono uppercase muted>
-                Mistakes
-              </BrutalistText>
-              <BrutalistText size={24} bold>
-                {completionMistakes}
-              </BrutalistText>
-            </View>
-          </View>
-
-          <BrutalistButton
-            title={isDaily ? "BACK TO DAILY" : isChapter ? "BACK TO CHAPTERS" : "BACK"}
-            onPress={() => router.back()}
-            variant="primary"
-            size="large"
-            style={{ marginTop: 24, marginHorizontal: 20 }}
-          />
-        </Animated.View>
-      ) : (
         <>
-          {/* Number Pad - shows 1-6 for 6x6 or 1-9 for 9x9 */}
-          <Animated.View entering={FadeInDown.delay(300).springify()}>
-            <NumberPad
-              onNumberPress={handleNumberPress}
-              remainingCounts={remainingCounts}
-              maxNumber={gridConfig.maxNumber}
-            />
+          {/* Board (view-only) */}
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.boardContainer}>
+            <SudokuBoard selectedCell={null} onCellPress={() => {}} />
           </Animated.View>
-
-          {/* Tools */}
-          <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.tools}>
-            <BrutalistButton
-              title="UNDO"
-              onPress={() => {}}
-              variant="ghost"
-              size="small"
-              style={styles.toolBtn}
-            />
-            <BrutalistButton
-              title="ERASE"
-              onPress={handleErase}
-              variant="ghost"
-              size="small"
-              style={styles.toolBtn}
-            />
-            <BrutalistButton
-              title="NOTES"
-              onPress={toggleNotesMode}
-              variant={notesMode ? 'primary' : 'ghost'}
-              size="small"
-              style={styles.toolBtn}
-            />
-            <BrutalistButton
-              title="HINT"
-              onPress={handleHint}
-              variant="ghost"
-              size="small"
-              style={styles.toolBtn}
-            />
-          </Animated.View>
+          {/* View-Only Stats */}
+          <ViewOnlyStats
+            completionTime={completionTime}
+            completionMistakes={completionMistakes}
+            completionRank={completionRank}
+            isDaily={isDaily}
+            isChapter={isChapter}
+            onBack={() => router.back()}
+          />
         </>
-      )}
-
-      {/* Daily Completion Modal - only show if not view-only */}
-      {isDaily && !isViewOnly && (
-        <DailyCompletionModal
-          visible={showDailyModal}
-          onClose={() => {
-            setShowDailyModal(false);
-            router.back();
-          }}
-          challengeId={challengeId}
-          challengeDate={challengeDate}
-          userId={userId}
-          timeSeconds={gameState?.timer || 0}
-          mistakes={mistakesCount}
-          hintsUsed={gameState?.hintsUsed || 0}
+      ) : (
+        <GamePlayArea
+          gameState={gameState}
+          selectedCell={selectedCell}
+          notesMode={notesMode}
+          onCellPress={handleCellPress}
+          onNumberPress={handleNumberPress}
+          onErase={handleErase}
+          onToggleNotes={toggleNotesMode}
+          onHint={handleHint}
         />
       )}
 
-      {/* Chapter Completion Modal */}
-      {isChapter && (
-        <ChapterCompletionModal
-          visible={showChapterModal}
-          onClose={handleBackToChapters}
-          onNextPuzzle={handleNextPuzzle}
-          puzzleNumber={puzzleNumber}
-          nextPuzzleNumber={puzzleNumber + 1}
-          difficulty={getPuzzleDifficulty(puzzleNumber + 1)}
-          timeSeconds={gameState?.timer || 0}
-          mistakes={mistakesCount}
-        />
-      )}
-
-      {/* Free Run Completion Modal */}
-      {!isDaily && !isChapter && (
-        <FreeRunCompletionModal
-          visible={showFreeRunModal}
-          onClose={handleBackToFreeRun}
-          onPlayAgain={handleFreeRunPlayAgain}
-          difficulty={gameState?.difficulty || 'easy'}
-          gridType={gameState?.gridType || '9x9'}
-          timeSeconds={gameState?.timer || 0}
-          mistakes={mistakesCount}
-        />
-      )}
-
-      {/* Smart Hint Modal */}
-      <SmartHintModal
-        visible={showHintModal}
-        hint={currentHint}
-        onClose={() => setShowHintModal(false)}
+      {/* Modals */}
+      <GameModalsManager
+        isDaily={isDaily}
+        isChapter={isChapter}
+        isViewOnly={isViewOnly}
+        showDailyModal={modals.showDailyModal}
+        showChapterModal={modals.showChapterModal}
+        showFreeRunModal={modals.showFreeRunModal}
+        showHintModal={modals.showHintModal}
+        onCloseDailyModal={handleDailyModalClose}
+        onCloseChapterModal={handleBackToChapters}
+        onCloseFreeRunModal={handleBackToFreeRun}
+        onCloseHintModal={modals.closeHintModal}
+        currentHint={modals.currentHint}
         onApplyHint={handleApplyHint}
+        dailyProps={{
+          challengeId,
+          challengeDate,
+          userId: supabaseUserId,
+          difficulty: gameState.difficulty,
+          timeSeconds: gameState.timer || 0,
+          mistakes: gameState.mistakes,
+          hintsUsed: gameState.hintsUsed || 0,
+        }}
+        chapterProps={{
+          puzzleNumber,
+          nextPuzzleNumber: puzzleNumber + 1,
+          difficulty: getPuzzleDifficulty(puzzleNumber + 1),
+          timeSeconds: gameState.timer || 0,
+          mistakes: gameState.mistakes,
+          onNextPuzzle: handleNextPuzzle,
+        }}
+        freeRunProps={{
+          difficulty: gameState.difficulty,
+          gridType: gameState.gridType,
+          timeSeconds: gameState.timer || 0,
+          mistakes: gameState.mistakes,
+          onPlayAgain: handleFreeRunPlayAgain,
+        }}
       />
 
-      {/* Banner Ad at bottom */}
+      {/* Banner Ad */}
       {showBanner && (
         <View style={[styles.bannerContainer, { paddingBottom: insets.bottom }]}>
           <BannerAd
             unitId={AD_UNIT_IDS.BANNER}
             size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-            requestOptions={{
-              requestNonPersonalizedAdsOnly: true,
-            }}
+            requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>
       )}
@@ -688,28 +570,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingVertical: 8,
-  },
-  tools: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  toolBtn: {
-    minWidth: 70,
-  },
-  viewOnlyStats: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  viewOnlyStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
-    borderWidth: 2,
-  },
-  viewOnlyStat: {
-    alignItems: 'center',
   },
   bannerContainer: {
     alignItems: 'center',

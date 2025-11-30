@@ -15,7 +15,7 @@ import { AchievementCard } from '../src/components/AchievementCard';
 import { useTheme } from '../src/context/ThemeContext';
 import { statsService } from '../src/services/statsService';
 import { gameCenterService } from '../src/services/gameCenter';
-import { loadData, STORAGE_KEYS } from '../src/utils/storage';
+import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
 import {
   ACHIEVEMENTS,
   CATEGORY_LABELS,
@@ -34,12 +34,22 @@ export default function AchievementsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
 
-  // Load user achievements
+  // Load user achievements from secure storage
   useEffect(() => {
     const loadAchievements = async () => {
       try {
-        const userData = await loadData<{ odooUserId: string }>(STORAGE_KEYS.USER_ID);
-        const currentUserId = userData?.odooUserId || null;
+        const storedData = await loadSecureData(STORAGE_KEYS.USER_ID);
+        let currentUserId: string | null = null;
+
+        if (storedData) {
+          try {
+            const identity = JSON.parse(storedData);
+            currentUserId = identity?.supabaseUserId || null;
+          } catch {
+            // Invalid JSON, ignore
+          }
+        }
+
         setUserId(currentUserId);
 
         if (currentUserId) {

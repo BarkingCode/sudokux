@@ -17,7 +17,7 @@ import { HeatmapCalendar, generateHeatmapData } from '../src/components/HeatmapC
 import { SolveTimeTrends, calculateSolveTimeTrends } from '../src/components/SolveTimeTrends';
 import { useTheme } from '../src/context/ThemeContext';
 import { statsService } from '../src/services/statsService';
-import { loadData, STORAGE_KEYS } from '../src/utils/storage';
+import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
 import type { UserStats, GameSession } from '../src/lib/database.types';
 
 const formatTime = (seconds: number): string => {
@@ -60,8 +60,18 @@ export default function StatsScreen() {
     else setIsLoading(true);
 
     try {
-      const userData = await loadData<{ odooUserId: string }>(STORAGE_KEYS.USER_ID);
-      const currentUserId = userData?.odooUserId || null;
+      const storedData = await loadSecureData(STORAGE_KEYS.USER_ID);
+      let currentUserId: string | null = null;
+
+      if (storedData) {
+        try {
+          const identity = JSON.parse(storedData);
+          currentUserId = identity?.supabaseUserId || null;
+        } catch {
+          // Invalid JSON, ignore
+        }
+      }
+
       setUserId(currentUserId);
 
       if (currentUserId) {

@@ -5,7 +5,9 @@ import { Platform } from 'react-native';
 // Keys for storage
 export const STORAGE_KEYS = {
   USER_ID: 'sudoku_user_id',
-  GAME_STATE: 'sudoku_game_state',
+  GAME_STATE: 'sudoku_game_state', // Legacy - no longer used for auto-restore
+  FREERUN_GAME_STATE: 'sudoku_freerun_game_state', // Free Run mode game state
+  DAILY_GAME_STATE: 'sudoku_daily_game_state', // Daily challenge game state
   SETTINGS: 'sudoku_settings',
   STATS: 'sudoku_stats',
   CHAPTER_PROGRESS: 'sudoku_chapter_progress',

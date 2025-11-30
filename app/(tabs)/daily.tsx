@@ -14,6 +14,7 @@ import { Settings } from 'lucide-react-native';
 import { BrutalistText } from '../../src/components/BrutalistText';
 import { BrutalistButton } from '../../src/components/BrutalistButton';
 import { BannerAd } from '../../src/components/BannerAd';
+import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { StreakDisplay } from '../../src/components/StreakDisplay';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useGame, Difficulty, GridType } from '../../src/context/GameContext';
@@ -198,6 +199,7 @@ export default function DailyScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <OfflineBanner message="Offline - Using local puzzle. Leaderboard unavailable." />
 
       <ScrollView
         style={styles.scrollView}

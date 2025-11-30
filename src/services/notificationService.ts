@@ -43,19 +43,23 @@ class NotificationService {
   private localPreferences: NotificationPreferences = { ...DEFAULT_PREFERENCES };
 
   /**
-   * Check if user exists in Supabase users table
+   * Get Supabase user ID from internal_id
+   * Returns the Supabase UUID if user exists, null otherwise
    */
-  private async userExistsInSupabase(userId: string): Promise<boolean> {
+  private async getSupabaseUserId(internalId: string): Promise<string | null> {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('id')
-        .eq('internal_id', userId)
+        .eq('internal_id', internalId)
         .maybeSingle();
 
-      return !error && data !== null;
+      if (error || !data) {
+        return null;
+      }
+      return data.id;
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -112,12 +116,12 @@ class NotificationService {
   /**
    * Store push token in Supabase
    */
-  private async storeToken(userId: string, token: string): Promise<void> {
+  private async storeToken(internalId: string, token: string): Promise<void> {
     try {
-      // Check if user exists in Supabase first
-      const userExists = await this.userExistsInSupabase(userId);
+      // Get Supabase user ID from internal_id
+      const supabaseUserId = await this.getSupabaseUserId(internalId);
 
-      if (!userExists) {
+      if (!supabaseUserId) {
         // User not synced to Supabase yet, skip storing token
         return;
       }
@@ -126,7 +130,7 @@ class NotificationService {
         .from('push_tokens')
         .upsert(
           {
-            user_id: userId,
+            user_id: supabaseUserId,
             expo_push_token: token,
             platform: Platform.OS,
             device_name: Device.deviceName || 'Unknown Device',
@@ -148,14 +152,17 @@ class NotificationService {
   /**
    * Remove push token (on logout or disable)
    */
-  async removeToken(userId: string): Promise<void> {
+  async removeToken(internalId: string): Promise<void> {
     if (!this.expoPushToken) return;
 
     try {
+      const supabaseUserId = await this.getSupabaseUserId(internalId);
+      if (!supabaseUserId) return;
+
       await supabase
         .from('push_tokens')
         .update({ is_active: false })
-        .eq('user_id', userId)
+        .eq('user_id', supabaseUserId)
         .eq('expo_push_token', this.expoPushToken);
     } catch (error) {
       console.error('Error removing push token:', error);
@@ -165,12 +172,12 @@ class NotificationService {
   /**
    * Get notification preferences for a user
    */
-  async getPreferences(userId: string): Promise<NotificationPreferences> {
+  async getPreferences(internalId: string): Promise<NotificationPreferences> {
     try {
-      // Check if user exists in Supabase first
-      const userExists = await this.userExistsInSupabase(userId);
+      // Get Supabase user ID from internal_id
+      const supabaseUserId = await this.getSupabaseUserId(internalId);
 
-      if (!userExists) {
+      if (!supabaseUserId) {
         // User not synced to Supabase yet, return local preferences
         return this.localPreferences;
       }
@@ -178,12 +185,12 @@ class NotificationService {
       const { data, error } = await supabase
         .from('notification_preferences')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', supabaseUserId)
         .single();
 
       if (error || !data) {
         // Return defaults and create preference record
-        await this.updatePreferences(userId, DEFAULT_PREFERENCES);
+        await this.updatePreferencesWithSupabaseId(supabaseUserId, DEFAULT_PREFERENCES);
         return DEFAULT_PREFERENCES;
       }
 
@@ -204,10 +211,52 @@ class NotificationService {
   }
 
   /**
+   * Update notification preferences (internal method using Supabase ID)
+   */
+  private async updatePreferencesWithSupabaseId(
+    supabaseUserId: string,
+    preferences: Partial<NotificationPreferences>
+  ): Promise<boolean> {
+    const updateData: Record<string, unknown> = {};
+
+    if (preferences.dailyReminderEnabled !== undefined) {
+      updateData.daily_reminder_enabled = preferences.dailyReminderEnabled;
+    }
+    if (preferences.reminderHour !== undefined) {
+      updateData.reminder_hour = preferences.reminderHour;
+    }
+    if (preferences.reminderMinute !== undefined) {
+      updateData.reminder_minute = preferences.reminderMinute;
+    }
+    if (preferences.timezone !== undefined) {
+      updateData.timezone = preferences.timezone;
+    }
+
+    const { error } = await supabase
+      .from('notification_preferences')
+      .upsert(
+        {
+          user_id: supabaseUserId,
+          ...updateData,
+        },
+        {
+          onConflict: 'user_id',
+        }
+      );
+
+    if (error) {
+      console.error('Failed to update preferences:', error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Update notification preferences
    */
   async updatePreferences(
-    userId: string,
+    internalId: string,
     preferences: Partial<NotificationPreferences>
   ): Promise<boolean> {
     try {
@@ -225,47 +274,15 @@ class NotificationService {
         this.localPreferences.timezone = preferences.timezone;
       }
 
-      // Check if user exists in Supabase before syncing
-      const userExists = await this.userExistsInSupabase(userId);
+      // Get Supabase user ID from internal_id
+      const supabaseUserId = await this.getSupabaseUserId(internalId);
 
-      if (!userExists) {
+      if (!supabaseUserId) {
         // User not synced to Supabase yet, local update is sufficient
         return true;
       }
 
-      const updateData: Record<string, unknown> = {};
-
-      if (preferences.dailyReminderEnabled !== undefined) {
-        updateData.daily_reminder_enabled = preferences.dailyReminderEnabled;
-      }
-      if (preferences.reminderHour !== undefined) {
-        updateData.reminder_hour = preferences.reminderHour;
-      }
-      if (preferences.reminderMinute !== undefined) {
-        updateData.reminder_minute = preferences.reminderMinute;
-      }
-      if (preferences.timezone !== undefined) {
-        updateData.timezone = preferences.timezone;
-      }
-
-      const { error } = await supabase
-        .from('notification_preferences')
-        .upsert(
-          {
-            user_id: userId,
-            ...updateData,
-          },
-          {
-            onConflict: 'user_id',
-          }
-        );
-
-      if (error) {
-        console.error('Failed to update preferences:', error);
-        return false;
-      }
-
-      return true;
+      return await this.updatePreferencesWithSupabaseId(supabaseUserId, preferences);
     } catch (error) {
       console.error('Error updating preferences:', error);
       return false;

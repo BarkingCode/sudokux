@@ -252,6 +252,7 @@ export type Database = {
           total_games: number | null;
           total_hints: number | null;
           total_mistakes: number | null;
+          total_points: number | null;
           total_wins: number | null;
           total_xp: number | null;
           updated_at: string;
@@ -273,6 +274,7 @@ export type Database = {
           total_games?: number | null;
           total_hints?: number | null;
           total_mistakes?: number | null;
+          total_points?: number | null;
           total_wins?: number | null;
           total_xp?: number | null;
           updated_at?: string;
@@ -294,6 +296,7 @@ export type Database = {
           total_games?: number | null;
           total_hints?: number | null;
           total_mistakes?: number | null;
+          total_points?: number | null;
           total_wins?: number | null;
           total_xp?: number | null;
           updated_at?: string;
@@ -369,6 +372,26 @@ export type Database = {
         };
         Relationships: [];
       };
+      points_leaderboard: {
+        Row: {
+          user_id: string | null;
+          nickname: string | null;
+          country: string | null;
+          points: number | null;
+          rank: number | null;
+        };
+        Relationships: [];
+      };
+      points_leaderboard_by_country: {
+        Row: {
+          user_id: string | null;
+          nickname: string | null;
+          country: string | null;
+          points: number | null;
+          rank: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       get_user_rank: {
@@ -389,6 +412,22 @@ export type Database = {
           timezone: string;
           user_id: string;
         }[];
+      };
+      get_user_points_rank: {
+        Args: {
+          p_user_id: string;
+          p_country: string | null;
+        };
+        Returns: {
+          rank: number;
+          total_players: number;
+        }[];
+      };
+      calculate_user_points: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: number;
       };
     };
     Enums: {
@@ -417,7 +456,7 @@ export type PushTokenInsert = Database['public']['Tables']['push_tokens']['Inser
 export type NotificationPreferences = Database['public']['Tables']['notification_preferences']['Row'];
 export type NotificationPreferencesInsert = Database['public']['Tables']['notification_preferences']['Insert'];
 export type NotificationLog = Database['public']['Tables']['notification_logs']['Row'];
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'extreme' | 'insane' | 'inhuman';
 
 // Chapter completions types (for replay feature)
 export interface ChapterCompletion {

@@ -359,7 +359,7 @@ Note the Ad Unit IDs for each.
     ]
   }
 }
-```
+``` 
 
 ### Step 5: Update Ad Config
 

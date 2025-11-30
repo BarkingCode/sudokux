@@ -8,6 +8,7 @@
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { Platform } from 'react-native';
+import { getLocales } from 'expo-localization';
 import { loadSecureData, saveSecureData, STORAGE_KEYS } from './storage';
 import { userService, gameCenterService } from '../services';
 import { googleSignInService } from '../services/googleSignIn';
@@ -35,6 +36,22 @@ const generateNickname = (): string => {
 };
 
 /**
+ * Get country code from device locale settings
+ * Returns ISO 3166-1 alpha-2 country code (e.g., 'US', 'GB', 'JP')
+ */
+const getDeviceCountry = (): string | undefined => {
+  try {
+    const locales = getLocales();
+    if (locales.length > 0 && locales[0].regionCode) {
+      return locales[0].regionCode;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Get or create the local user identity
  */
 export const getOrCreateUserIdentity = async (): Promise<UserIdentity> => {
@@ -42,13 +59,24 @@ export const getOrCreateUserIdentity = async (): Promise<UserIdentity> => {
 
   if (storedId) {
     try {
-      const identity = JSON.parse(storedId);
+      const identity = JSON.parse(storedId) as UserIdentity;
+
+      // Update country for existing users who don't have it set
+      if (!identity.country) {
+        const country = getDeviceCountry();
+        if (country) {
+          identity.country = country;
+          await saveSecureData(STORAGE_KEYS.USER_ID, JSON.stringify(identity));
+        }
+      }
+
       return identity;
     } catch {
       return {
         id: storedId,
         nickname: 'Unknown-Player',
         createdAt: new Date().toISOString(),
+        country: getDeviceCountry(),
       };
     }
   }
@@ -57,6 +85,7 @@ export const getOrCreateUserIdentity = async (): Promise<UserIdentity> => {
     id: uuidv4(),
     nickname: generateNickname(),
     createdAt: new Date().toISOString(),
+    country: getDeviceCountry(),
   };
 
   await saveSecureData(STORAGE_KEYS.USER_ID, JSON.stringify(newIdentity));
@@ -113,9 +142,14 @@ export const initializeUserWithBackend = async (
     } else if (Platform.OS === 'android' && updatedIdentity.googleId && !supabaseUser.google_id) {
       await userService.linkGoogle(supabaseUser.id, updatedIdentity.googleId);
     }
+
+    // 4. Update country in Supabase if local has it but remote doesn't
+    if (updatedIdentity.country && !supabaseUser.country) {
+      await userService.updateProfile(supabaseUser.id, { country: updatedIdentity.country });
+    }
   }
 
-  // 4. Save updated identity locally if anything changed
+  // 5. Save updated identity locally if anything changed
   if (
     updatedIdentity.gameCenterId !== identity.gameCenterId ||
     updatedIdentity.googleId !== identity.googleId ||

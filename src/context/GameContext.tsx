@@ -78,6 +78,7 @@ interface GameContextType {
   saveChapterProgress: (puzzleNumber: number) => Promise<void>;
   loadChapterProgress: () => Promise<ChapterInProgress | null>;
   clearChapterProgress: () => Promise<void>;
+  incrementMistakes: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -133,29 +134,17 @@ const findConflictCells = (grid: number[][], gridType: GridType): string[] => {
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref to access current gameState in stable callbacks (avoids dependency issues)
+  const gameStateRef = useRef<GameState | null>(null);
 
-  // Load saved state on mount
-  useEffect(() => {
-    loadData<GameState>(STORAGE_KEYS.GAME_STATE).then((savedState) => {
-      if (savedState) {
-        // Ensure new fields exist for backward compatibility
-        if (!savedState.gridType) savedState.gridType = '9x9';
-        if (savedState.isLoading === undefined) savedState.isLoading = false;
-        if (!savedState.conflictCells) savedState.conflictCells = [];
-        if (savedState.hintsUsed === undefined) savedState.hintsUsed = 0;
-        // Always start paused - GameScreen will resume when focused
-        savedState.isPaused = true;
-        setGameState(savedState);
-      }
-    });
-  }, []);
+  // Keep ref in sync with state
+  gameStateRef.current = gameState;
 
-  // Save state when it changes (but not when loading)
-  useEffect(() => {
-    if (gameState && !gameState.isLoading) {
-      saveData(STORAGE_KEYS.GAME_STATE, gameState);
-    }
-  }, [gameState]);
+  // NOTE: Auto-load and auto-save of global GAME_STATE removed.
+  // Each game mode (Chapters, Daily, Free Run) now manages its own persistence:
+  // - Chapters: Uses CHAPTER_IN_PROGRESS for mid-game saves
+  // - Daily: No persistence needed (fresh each day)
+  // - Free Run: Uses FREERUN_GAME_STATE (managed by freerun.tsx)
 
   // Timer effect
   useEffect(() => {
@@ -194,8 +183,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading: true,
     });
 
-    // Load puzzle
-    const puzzle = await getRandomPuzzle(difficulty, gridType);
+    // Load puzzle - always generate fresh (bundled files have limited puzzles)
+    const puzzle = await getRandomPuzzle(difficulty, gridType, true);
 
     if (!puzzle) {
       console.error('Failed to load puzzle');
@@ -282,26 +271,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Save current chapter progress to storage
+   * Uses ref to access current gameState for stability (prevents infinite loops)
    */
   const saveChapterProgress = useCallback(async (puzzleNumber: number) => {
-    if (!gameState || gameState.isComplete) return;
+    const currentState = gameStateRef.current;
+    if (!currentState || currentState.isComplete) return;
 
     const inProgress: ChapterInProgress = {
       puzzleNumber,
-      difficulty: gameState.difficulty,
-      gridType: gameState.gridType,
-      initialGrid: gameState.initialGrid,
-      currentGrid: gameState.grid,
-      solution: gameState.solution,
-      timer: gameState.timer,
-      mistakes: gameState.mistakes,
-      hintsUsed: gameState.hintsUsed,
-      notes: gameState.notes,
+      difficulty: currentState.difficulty,
+      gridType: currentState.gridType,
+      initialGrid: currentState.initialGrid,
+      currentGrid: currentState.grid,
+      solution: currentState.solution,
+      timer: currentState.timer,
+      mistakes: currentState.mistakes,
+      hintsUsed: currentState.hintsUsed,
+      notes: currentState.notes,
       savedAt: new Date().toISOString(),
     };
 
     await saveData(STORAGE_KEYS.CHAPTER_IN_PROGRESS, inProgress);
-  }, [gameState]);
+  }, []);
 
   /**
    * Load chapter progress from storage
@@ -444,6 +435,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }) : null);
   }, [gameState]);
 
+  /**
+   * Increment the mistake counter (called when user enters wrong number)
+   */
+  const incrementMistakes = useCallback(() => {
+    setGameState(prev => prev ? ({
+      ...prev,
+      mistakes: prev.mistakes + 1,
+    }) : null);
+  }, []);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -463,6 +464,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveChapterProgress,
       loadChapterProgress,
       clearChapterProgress,
+      incrementMistakes,
     }}>
       {children}
     </GameContext.Provider>

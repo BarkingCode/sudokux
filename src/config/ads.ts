@@ -37,30 +37,27 @@ export const FREERUN_GAMES_PER_REWARD = 5;
 export const GAMES_PER_SESSION = FREERUN_GAMES_PER_SESSION;
 export const GAMES_PER_REWARD = FREERUN_GAMES_PER_REWARD;
 
-// Test Ad Unit IDs (replace with real IDs for production)
-export const AD_UNIT_IDS = {
-  // Banner ads - shown on screens
-  BANNER: TestIds.BANNER,
-
-  // Interstitial ads - shown in Chapters mode
-  INTERSTITIAL: TestIds.INTERSTITIAL,
-
-  // Rewarded ads - watch to unlock more games in Free Run
-  REWARDED: TestIds.REWARDED,
+// Production Ad Unit IDs from environment variables
+const PRODUCTION_AD_UNIT_IDS = {
+  BANNER: Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_BANNER_IOS,
+    android: process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID,
+  }) as string,
+  INTERSTITIAL: Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS,
+    android: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID,
+  }) as string,
+  REWARDED: Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_REWARDED_IOS,
+    android: process.env.EXPO_PUBLIC_ADMOB_REWARDED_ANDROID,
+  }) as string,
 };
 
-// Production Ad Unit IDs (uncomment and use for release)
-// export const AD_UNIT_IDS = {
-//   BANNER: Platform.select({
-//     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//     android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//   }) as string,
-//   INTERSTITIAL: Platform.select({
-//     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//     android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//   }) as string,
-//   REWARDED: Platform.select({
-//     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//     android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-//   }) as string,
-// };
+// Use test IDs in development, production IDs in release builds
+export const AD_UNIT_IDS = __DEV__
+  ? {
+      BANNER: TestIds.BANNER,
+      INTERSTITIAL: TestIds.INTERSTITIAL,
+      REWARDED: TestIds.REWARDED,
+    }
+  : PRODUCTION_AD_UNIT_IDS;

@@ -3,7 +3,7 @@
  * Displays numbers in a 2-row grid layout:
  * - 9x9: Row 1 (1-5), Row 2 (6-9)
  * - 6x6: Row 1 (1-3), Row 2 (4-6)
- * Features larger buttons with remaining count indicators.
+ * Buttons are dimmed when all instances of a number are placed on the board.
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -102,14 +102,6 @@ const NumberButton: React.FC<NumberButtonProps> = ({
       >
         {num.toString()}
       </BrutalistText>
-      {/* Remaining count indicator */}
-      {remaining !== undefined && remaining > 0 && (
-        <View style={[styles.remainingBadge, { backgroundColor: colors.primary }]}>
-          <BrutalistText size={10} bold mono color={colors.background}>
-            {remaining}
-          </BrutalistText>
-        </View>
-      )}
     </AnimatedPressable>
   );
 };
@@ -195,16 +187,5 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     shadowOffset: { width: 3, height: 3 },
     elevation: 4,
-  },
-  remainingBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
   },
 });

@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { Check } from 'lucide-react-native';
 import { BrutalistText } from '../../src/components/BrutalistText';
 import { BannerAd } from '../../src/components/BannerAd';
+import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useGame, Difficulty, SavedPuzzleWithProgress } from '../../src/context/GameContext';
 import { loadData, saveData, loadSecureData, STORAGE_KEYS } from '../../src/utils/storage';
@@ -156,40 +157,74 @@ export default function ChaptersScreen() {
   // Load progress on mount and when screen is focused (returning from game)
   useFocusEffect(
     useCallback(() => {
-      // Reload completions when screen focuses (in case new puzzles were completed)
-      if (userId) {
-        chapterService.getAllCompletions(userId).then((data) => {
-          const completionsMap = new Map<number, ChapterCompletion>();
-          data.forEach((c) => completionsMap.set(c.puzzle_number, c));
-          setCompletions(completionsMap);
-        });
-      }
+      const loadAndSync = async () => {
+        // Load local progress first
+        const saved = await loadData<GameProgress>(STORAGE_KEYS.CHAPTER_PROGRESS);
+        let currentProgress = DEFAULT_PROGRESS;
 
-      loadData<GameProgress>(STORAGE_KEYS.CHAPTER_PROGRESS).then((saved) => {
         if (saved) {
           // Migration: handle old format
           if ((saved as any).currentChapter !== undefined) {
             // Old format - convert
             const oldProgress = saved as any;
-            const newProgress: GameProgress = {
+            currentProgress = {
               currentPuzzle: ((oldProgress.currentChapter - 1) * 5) + oldProgress.currentPuzzleInChapter + 1,
               completedPuzzles: [],
               chapterGamesCompleted: oldProgress.gamesPlayedSinceAd || 0,
             };
             // Mark all previous puzzles as completed
-            for (let i = 1; i < newProgress.currentPuzzle; i++) {
-              newProgress.completedPuzzles.push(i);
+            for (let i = 1; i < currentProgress.currentPuzzle; i++) {
+              currentProgress.completedPuzzles.push(i);
             }
-            setProgress(newProgress);
           } else {
             if (saved.chapterGamesCompleted === undefined) {
               saved.chapterGamesCompleted = 0;
             }
-            setProgress(saved);
+            currentProgress = saved;
           }
         }
+
+        // Reload completions from DB and sync with local progress
+        if (userId) {
+          const data = await chapterService.getAllCompletions(userId);
+          const completionsMap = new Map<number, ChapterCompletion>();
+          data.forEach((c) => completionsMap.set(c.puzzle_number, c));
+          setCompletions(completionsMap);
+
+          // Sync local progress with DB completions (DB is source of truth)
+          const dbCompletedPuzzles = Array.from(completionsMap.keys());
+          const localCompletedSet = new Set(currentProgress.completedPuzzles);
+          let needsSync = false;
+
+          // Find puzzles completed in DB but not in local state
+          for (const puzzleNum of dbCompletedPuzzles) {
+            if (!localCompletedSet.has(puzzleNum)) {
+              console.log('[ChaptersScreen] Found puzzle', puzzleNum, 'completed in DB but not locally, syncing...');
+              localCompletedSet.add(puzzleNum);
+              needsSync = true;
+            }
+          }
+
+          if (needsSync) {
+            const syncedCompletedPuzzles = Array.from(localCompletedSet).sort((a, b) => a - b);
+            // Update currentPuzzle to be after the highest completed puzzle
+            const highestCompleted = Math.max(...syncedCompletedPuzzles, 0);
+            const newCurrentPuzzle = Math.max(currentProgress.currentPuzzle, highestCompleted + 1);
+
+            currentProgress = {
+              ...currentProgress,
+              completedPuzzles: syncedCompletedPuzzles,
+              currentPuzzle: newCurrentPuzzle,
+            };
+            console.log('[ChaptersScreen] Synced local progress:', currentProgress);
+          }
+        }
+
+        setProgress(currentProgress);
         setIsLoading(false);
-      });
+      };
+
+      loadAndSync();
     }, [userId])
   );
 
@@ -211,24 +246,56 @@ export default function ChaptersScreen() {
   // Scroll to current puzzle on load
   useEffect(() => {
     if (!isLoading && scrollRef.current) {
-      const currentRow = totalPuzzles - progress.currentPuzzle;
+      // Calculate actual current puzzle based on both local and DB completions
+      const dbCompletedPuzzles = Array.from(completions.keys());
+      const allCompleted = new Set([...progress.completedPuzzles, ...dbCompletedPuzzles]);
+      const highestCompleted = allCompleted.size > 0 ? Math.max(...allCompleted) : 0;
+      const actualCurrent = Math.max(progress.currentPuzzle, highestCompleted + 1);
+
+      const currentRow = totalPuzzles - actualCurrent;
       const scrollY = Math.max(0, currentRow * rowHeight - 280);
       setTimeout(() => {
         scrollRef.current?.scrollTo({ y: scrollY, animated: true });
       }, 300);
     }
-  }, [isLoading, progress.currentPuzzle, totalPuzzles, rowHeight]);
+  }, [isLoading, progress.currentPuzzle, progress.completedPuzzles, completions, totalPuzzles, rowHeight]);
 
   const handlePuzzlePress = useCallback(async (puzzleNum: number) => {
-    if (puzzleNum > progress.currentPuzzle) return;
+    // Check if this puzzle is completed - DB is source of truth
+    const savedCompletion = completions.get(puzzleNum);
+
+    // Calculate actual current puzzle based on all completions
+    const dbCompletedPuzzles = Array.from(completions.keys());
+    const allCompleted = new Set([...progress.completedPuzzles, ...dbCompletedPuzzles]);
+    const highestCompleted = allCompleted.size > 0 ? Math.max(...allCompleted) : 0;
+    const actualCurrent = Math.max(progress.currentPuzzle, highestCompleted + 1);
+
+    // Allow access if: puzzle is at or before actualCurrentPuzzle, OR it's completed in DB
+    if (puzzleNum > actualCurrent && !savedCompletion) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Check if this puzzle is completed
-    const isCompleted = progress.completedPuzzles.includes(puzzleNum);
-    const savedCompletion = completions.get(puzzleNum);
+    const isCompletedLocally = progress.completedPuzzles.includes(puzzleNum);
 
-    if (isCompleted && savedCompletion) {
+    // If completed in DB (source of truth), show in view-only mode
+    if (savedCompletion) {
+      // Sync local state if needed (DB shows completed but local state is behind)
+      const needsSync = !isCompletedLocally || progress.currentPuzzle < actualCurrent;
+      if (needsSync) {
+        console.log('[ChaptersScreen] Syncing local progress - updating to puzzle', actualCurrent);
+        const completedPuzzles = Array.from(allCompleted).sort((a, b) => a - b);
+
+        // Update state and save immediately before navigation
+        const newProgress = {
+          ...progress,
+          completedPuzzles,
+          currentPuzzle: actualCurrent,
+        };
+        setProgress(newProgress);
+        // Save immediately to storage (don't wait for effect)
+        saveData(STORAGE_KEYS.CHAPTER_PROGRESS, newProgress);
+      }
+
       // COMPLETED PUZZLE: Show in view-only mode with solved grid
       const solutionGrid = chapterService.parsePuzzleGrid(savedCompletion.solution_grid);
 
@@ -381,11 +448,17 @@ export default function ChaptersScreen() {
     );
   }
 
-  const currentDifficulty = getPuzzleDifficulty(progress.currentPuzzle);
+  // Calculate actual current puzzle based on both local and DB completions
+  const dbCompletedPuzzles = Array.from(completions.keys());
+  const allCompleted = new Set([...progress.completedPuzzles, ...dbCompletedPuzzles]);
+  const highestCompleted = allCompleted.size > 0 ? Math.max(...allCompleted) : 0;
+  const actualCurrentPuzzle = Math.max(progress.currentPuzzle, highestCompleted + 1);
+  const currentDifficulty = getPuzzleDifficulty(actualCurrentPuzzle);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <OfflineBanner message="Offline - Progress will sync when back online" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -397,7 +470,7 @@ export default function ChaptersScreen() {
         </BrutalistText>
         <View style={styles.headerInfo}>
           <BrutalistText size={12} mono muted>
-            Puzzle {progress.currentPuzzle}
+            Puzzle {actualCurrentPuzzle}
           </BrutalistText>
           <View style={[styles.difficultyBadge, { borderColor: getDifficultyColor(currentDifficulty, colors) }]}>
             <BrutalistText
@@ -424,7 +497,10 @@ export default function ChaptersScreen() {
           {pathData.map((node, index) => {
             if (index < pathData.length - 1) {
               const nextNode = pathData[index + 1];
-              const isCompleted = node.puzzle < progress.currentPuzzle;
+              // Path is completed if puzzle is completed in DB or locally
+              const isCompleted = completions.has(node.puzzle) ||
+                                 progress.completedPuzzles.includes(node.puzzle) ||
+                                 node.puzzle < actualCurrentPuzzle;
               return (
                 <React.Fragment key={`segment-${node.puzzle}`}>
                   {renderPathSegment(node, nextNode, isCompleted)}
@@ -437,10 +513,14 @@ export default function ChaptersScreen() {
 
         {/* Render puzzle nodes (above path) */}
         {pathData.map((node) => {
-          const isCompleted = progress.completedPuzzles.includes(node.puzzle) ||
-                             node.puzzle < progress.currentPuzzle;
-          const isCurrent = node.puzzle === progress.currentPuzzle;
-          const isLocked = node.puzzle > progress.currentPuzzle;
+          // DB completions is source of truth for completed status
+          const isCompletedInDB = completions.has(node.puzzle);
+          const isCompletedLocally = progress.completedPuzzles.includes(node.puzzle) ||
+                                     node.puzzle < actualCurrentPuzzle;
+          const isCompleted = isCompletedInDB || isCompletedLocally;
+          // Current is the actual next puzzle to play (first non-completed)
+          const isCurrent = node.puzzle === actualCurrentPuzzle;
+          const isLocked = node.puzzle > actualCurrentPuzzle;
           const difficulty = getPuzzleDifficulty(node.puzzle);
 
           return (

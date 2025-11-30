@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Trophy } from 'lucide-react-native';
 import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
@@ -18,6 +18,8 @@ import {
   DailyLeaderboardEntry,
 } from '../services/dailyChallengeService';
 import { badgeService } from '../services/badgeService';
+import { checkAchievements } from '../services/achievementService';
+import type { Difficulty } from '../lib/database.types';
 
 interface DailyCompletionModalProps {
   visible: boolean;
@@ -25,6 +27,7 @@ interface DailyCompletionModalProps {
   challengeId: string;
   challengeDate: string;
   userId: string | null;
+  difficulty: Difficulty;
   timeSeconds: number;
   mistakes: number;
   hintsUsed: number;
@@ -52,6 +55,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
   challengeId,
   challengeDate,
   userId,
+  difficulty,
   timeSeconds,
   mistakes,
   hintsUsed,
@@ -109,6 +113,20 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
           // Badge service failure is non-critical
           console.log('Badge service error:', e);
         }
+
+        // Check and unlock achievements after successful daily completion
+        try {
+          await checkAchievements(userId, {
+            difficulty,
+            timeSeconds,
+            mistakes,
+            hintsUsed,
+          });
+          console.log('[DailyCompletionModal] Checked achievements');
+        } catch (e) {
+          // Achievement check failure is non-critical
+          console.log('Achievement check error:', e);
+        }
       } else if (result.error && !result.error.includes('Already completed')) {
         // Only show error if it's not "already completed"
         setSubmitError(result.error);
@@ -147,7 +165,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [userId, challengeId, timeSeconds, mistakes, hintsUsed]);
+  }, [userId, challengeId, difficulty, timeSeconds, mistakes, hintsUsed]);
 
   const handleRetry = useCallback(() => {
     setHasSubmitted(false);
@@ -180,8 +198,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-        <Animated.View
-          entering={SlideInUp.springify()}
+        <View
           style={[styles.modal, { backgroundColor: colors.background, borderColor: colors.primary }]}
         >
           {/* Header */}
@@ -335,7 +352,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
               style={styles.closeButton}
             />
           </View>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -350,9 +367,10 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: '100%',
-    maxHeight: '90%',
+    maxHeight: '85%',
     borderWidth: 3,
     padding: 24,
+    overflow: 'hidden',
   },
   header: {
     alignItems: 'center',
@@ -371,7 +389,8 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   content: {
-    maxHeight: 350,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   statsContainer: {
     marginBottom: 24,

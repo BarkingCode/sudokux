@@ -1,22 +1,24 @@
 /**
  * Free Run screen - Play any difficulty/grid size without progression tracking.
- * Shows continue option if there's an unfinished game.
+ * Supports continuing in-progress Free Run games.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { BrutalistText } from '../../src/components/BrutalistText';
 import { BrutalistButton } from '../../src/components/BrutalistButton';
 import { BannerAd } from '../../src/components/BannerAd';
+import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { GameLimitModal } from '../../src/components/GameLimitModal';
 import { useTheme } from '../../src/context/ThemeContext';
-import { useGame, Difficulty, GridType } from '../../src/context/GameContext';
+import { useGame, Difficulty, GridType, GameState } from '../../src/context/GameContext';
 import { useAds } from '../../src/context/AdContext';
+import { loadData, removeData, STORAGE_KEYS } from '../../src/utils/storage';
 
 const GRID_TYPES: { value: GridType; label: string; description: string }[] = [
   { value: '6x6', label: '6x6', description: 'Mini' },
@@ -35,34 +37,39 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
 export default function FreeRunScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { gameState, startNewGame } = useGame();
+  const { startNewGame, loadSavedPuzzleWithProgress } = useGame();
   const { isAtLimit, consumeGame } = useAds();
   const [selectedGrid, setSelectedGrid] = useState<GridType>('9x9');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('easy');
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [savedGame, setSavedGame] = useState<GameState | null>(null);
 
-  // Check if there's an unfinished game
-  const hasUnfinishedGame = useMemo(() => {
-    if (!gameState) return false;
-    if (gameState.isComplete) return false;
-    if (gameState.isLoading) return false;
-    // Check if game has actually started (has some progress)
-    return gameState.puzzleId !== null;
-  }, [gameState]);
+  // Load saved Free Run game on focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData<GameState>(STORAGE_KEYS.FREERUN_GAME_STATE).then((saved) => {
+        if (saved && !saved.isComplete && saved.puzzleId) {
+          setSavedGame(saved);
+        } else {
+          setSavedGame(null);
+        }
+      });
+    }, [])
+  );
 
-  // Calculate progress percentage
+  // Calculate progress percentage for saved game
   const progressPercent = useMemo(() => {
-    if (!gameState || !hasUnfinishedGame) return 0;
-    const gridSize = gameState.gridType === '6x6' ? 6 : 9;
+    if (!savedGame) return 0;
+    const gridSize = savedGame.gridType === '6x6' ? 6 : 9;
     const totalCells = gridSize * gridSize;
     let filledCells = 0;
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        if (gameState.grid[r][c] !== 0) filledCells++;
+        if (savedGame.grid[r][c] !== 0) filledCells++;
       }
     }
     return Math.round((filledCells / totalCells) * 100);
-  }, [gameState, hasUnfinishedGame]);
+  }, [savedGame]);
 
   // Format time for display
   const formatTime = (seconds: number) => {
@@ -82,11 +89,28 @@ export default function FreeRunScreen() {
   }, []);
 
   const handleContinue = useCallback(() => {
+    if (!savedGame) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/game');
-  }, [router]);
 
-  const handleStartGame = useCallback(() => {
+    // Load the saved game state
+    loadSavedPuzzleWithProgress({
+      puzzleId: savedGame.puzzleId || 'freerun',
+      difficulty: savedGame.difficulty,
+      gridType: savedGame.gridType,
+      puzzle: savedGame.initialGrid,
+      solution: savedGame.solution,
+      initialGrid: savedGame.initialGrid,
+      grid: savedGame.grid,
+      timer: savedGame.timer,
+      mistakes: savedGame.mistakes,
+      hintsUsed: savedGame.hintsUsed,
+      notes: savedGame.notes,
+    });
+
+    router.push('/game');
+  }, [savedGame, loadSavedPuzzleWithProgress, router]);
+
+  const handleStartGame = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     // Check if user has games remaining
@@ -102,6 +126,10 @@ export default function FreeRunScreen() {
       return;
     }
 
+    // Clear any saved Free Run game when starting new
+    await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
+    setSavedGame(null);
+
     startNewGame(selectedDifficulty, selectedGrid);
     router.push('/game');
   }, [selectedDifficulty, selectedGrid, startNewGame, router, isAtLimit, consumeGame]);
@@ -109,6 +137,7 @@ export default function FreeRunScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <OfflineBanner message="Offline - Playing locally" />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Header */}
@@ -122,8 +151,8 @@ export default function FreeRunScreen() {
           <View style={[styles.headerLine, { backgroundColor: colors.primary }]} />
         </Animated.View>
 
-        {/* Continue Game Card - Only show if there's an unfinished game */}
-        {hasUnfinishedGame && gameState && (
+        {/* Continue Game Card - Only show if there's a saved Free Run game */}
+        {savedGame && (
           <Animated.View
             entering={FadeInUp.delay(150).springify()}
             style={[styles.continueCard, { borderColor: colors.accent }]}
@@ -138,19 +167,19 @@ export default function FreeRunScreen() {
               <View style={styles.continueRow}>
                 <BrutalistText size={14} muted>Difficulty</BrutalistText>
                 <BrutalistText size={14} bold uppercase>
-                  {gameState.difficulty}
+                  {savedGame.difficulty}
                 </BrutalistText>
               </View>
               <View style={styles.continueRow}>
                 <BrutalistText size={14} muted>Grid</BrutalistText>
                 <BrutalistText size={14} bold>
-                  {gameState.gridType}
+                  {savedGame.gridType}
                 </BrutalistText>
               </View>
               <View style={styles.continueRow}>
                 <BrutalistText size={14} muted>Time</BrutalistText>
                 <BrutalistText size={14} bold mono>
-                  {formatTime(gameState.timer || 0)}
+                  {formatTime(savedGame.timer || 0)}
                 </BrutalistText>
               </View>
               <View style={styles.continueRow}>
@@ -170,9 +199,9 @@ export default function FreeRunScreen() {
           </Animated.View>
         )}
 
-        {/* New Game Section */}
+        {/* Game Selection Section */}
         <Animated.View entering={FadeInUp.delay(200).springify()} style={styles.newGameSection}>
-          {hasUnfinishedGame && (
+          {savedGame && (
             <BrutalistText size={12} mono uppercase muted style={styles.newGameLabel}>
               Or Start New Game
             </BrutalistText>
@@ -251,14 +280,14 @@ export default function FreeRunScreen() {
         {/* Start Button */}
         <Animated.View entering={FadeInUp.delay(400).springify()} style={styles.startSection}>
           <BrutalistButton
-            title={hasUnfinishedGame ? "START NEW GAME" : "START GAME"}
+            title={savedGame ? "START NEW GAME" : "START GAME"}
             onPress={handleStartGame}
-            variant={hasUnfinishedGame ? "outline" : "primary"}
+            variant={savedGame ? "outline" : "primary"}
             size="large"
             style={styles.startButton}
           />
           <BrutalistText size={11} mono muted style={styles.hint}>
-            {hasUnfinishedGame
+            {savedGame
               ? "This will replace your current game"
               : "No progress tracking - just play"}
           </BrutalistText>
@@ -355,6 +384,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     minWidth: 90,
+    flex: 1,
     alignItems: 'center',
   },
   startSection: {
