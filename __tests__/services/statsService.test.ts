@@ -33,10 +33,9 @@ jest.mock('../../src/lib/supabase', () => ({
   },
 }));
 
-// Mock game center service
+// Mock game center service (only leaderboard, achievements handled by Supabase)
 jest.mock('../../src/services/gameCenter', () => ({
   gameCenterService: {
-    unlockAchievement: jest.fn(() => Promise.resolve(true)),
     submitScore: jest.fn(() => Promise.resolve(true)),
   },
 }));

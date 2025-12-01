@@ -4,8 +4,8 @@
  * Export all backend services for easy importing
  */
 
-export { gameCenterService, LEADERBOARD_IDS, ACHIEVEMENT_IDS } from './gameCenter';
-export type { GameCenterPlayer, LeaderboardId, AchievementId } from './gameCenter';
+export { gameCenterService, LEADERBOARD_IDS } from './gameCenter';
+export type { GameCenterPlayer, LeaderboardId } from './gameCenter';
 
 export { userService } from './userService';
 export type { LocalUserIdentity } from './userService';

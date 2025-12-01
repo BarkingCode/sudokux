@@ -12,7 +12,18 @@ import {
   getDailyLeaderboard,
   getUserDailyRank,
   getDailyStreakInfo,
+  DailyChallenge,
 } from '../../src/services/dailyChallengeService';
+
+// Mock challenge object for testing
+const mockChallenge: DailyChallenge = {
+  id: 'challenge-id',
+  challenge_date: '2024-01-15',
+  grid_type: '9x9',
+  difficulty: 'medium',
+  puzzle_grid: [[0]],
+  solution_grid: [[1]],
+};
 
 // Mock Supabase
 const mockSingle = jest.fn();
@@ -215,7 +226,7 @@ describe('dailyChallengeService', () => {
       // First call (hasCompletedToday check) returns completion exists
       mockSingle.mockResolvedValueOnce({ data: { id: 'existing' }, error: null });
 
-      const result = await submitDailyCompletion('user-123', 'challenge-id', 300, 2, 1);
+      const result = await submitDailyCompletion('user-123', mockChallenge, 300, 2, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Already completed');
@@ -224,21 +235,26 @@ describe('dailyChallengeService', () => {
     it('should allow submission if not completed today', async () => {
       // First call (hasCompletedToday check) returns no completion
       mockSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-      // Second call (updateDailyStreak stats fetch)
+      // Second call (ensureChallengeExists check) returns challenge exists
+      mockSingle.mockResolvedValueOnce({ data: { id: 'challenge-id' }, error: null });
+      // Third call (updateDailyStreak stats fetch)
       mockSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
 
       mockInsert.mockResolvedValueOnce({ error: null });
 
-      const result = await submitDailyCompletion('user-123', 'challenge-id', 300, 2, 1);
+      const result = await submitDailyCompletion('user-123', mockChallenge, 300, 2, 1);
 
       expect(result.success).toBe(true);
     });
 
     it('should return error on insert failure', async () => {
+      // hasCompletedToday check - no completion
       mockSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
+      // ensureChallengeExists check - challenge exists
+      mockSingle.mockResolvedValueOnce({ data: { id: 'challenge-id' }, error: null });
       mockInsert.mockResolvedValueOnce({ error: { message: 'Insert failed' } });
 
-      const result = await submitDailyCompletion('user-123', 'challenge-id', 300, 2, 1);
+      const result = await submitDailyCompletion('user-123', mockChallenge, 300, 2, 1);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Insert failed');

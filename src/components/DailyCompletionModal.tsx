@@ -16,6 +16,7 @@ import {
   getDailyLeaderboard,
   getUserDailyRank,
   DailyLeaderboardEntry,
+  DailyChallenge,
 } from '../services/dailyChallengeService';
 import { badgeService } from '../services/badgeService';
 import { checkAchievements } from '../services/achievementService';
@@ -24,8 +25,7 @@ import type { Difficulty } from '../lib/database.types';
 interface DailyCompletionModalProps {
   visible: boolean;
   onClose: () => void;
-  challengeId: string;
-  challengeDate: string;
+  challenge: DailyChallenge;
   userId: string | null;
   difficulty: Difficulty;
   timeSeconds: number;
@@ -52,8 +52,7 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
 export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
   visible,
   onClose,
-  challengeId,
-  challengeDate,
+  challenge,
   userId,
   difficulty,
   timeSeconds,
@@ -101,7 +100,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     try {
       // Step 1: Submit the completion (with 10s timeout)
       const result = await withTimeout(
-        submitDailyCompletion(userId, challengeId, timeSeconds, mistakes, hintsUsed),
+        submitDailyCompletion(userId, challenge, timeSeconds, mistakes, hintsUsed),
         10000
       );
 
@@ -165,7 +164,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [userId, challengeId, difficulty, timeSeconds, mistakes, hintsUsed]);
+  }, [userId, challenge, difficulty, timeSeconds, mistakes, hintsUsed]);
 
   const handleRetry = useCallback(() => {
     setHasSubmitted(false);

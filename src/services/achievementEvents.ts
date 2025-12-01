@@ -3,7 +3,7 @@
  * Emits events when achievements are unlocked so the UI can show toast notifications.
  */
 
-import type { AchievementId } from './gameCenter';
+import type { AchievementId } from '../data/achievements';
 
 type AchievementListener = (achievementId: AchievementId) => void;
 

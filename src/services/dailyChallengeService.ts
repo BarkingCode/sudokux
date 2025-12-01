@@ -108,6 +108,37 @@ export const getTodayChallenge = async (): Promise<DailyChallenge | null> => {
 };
 
 /**
+ * Generate a deterministic UUID from a string
+ * Creates a valid UUID v4-like format that's consistent for the same input
+ */
+const generateDeterministicUUID = (input: string): string => {
+  // Create multiple hashes to fill all UUID positions
+  const hashes: number[] = [];
+  for (let j = 0; j < 4; j++) {
+    let hash = j * 12345; // Different seed for each segment
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char + j;
+      hash = hash & hash;
+    }
+    hashes.push(Math.abs(hash));
+  }
+
+  // Convert to hex strings
+  const hexParts = hashes.map((h) => h.toString(16).padStart(8, '0'));
+
+  // Format as UUID: xxxxxxxx-xxxx-4xxx-axxx-xxxxxxxxxxxx
+  // Version 4 UUID format with deterministic values
+  return [
+    hexParts[0].slice(0, 8),
+    hexParts[1].slice(0, 4),
+    '4' + hexParts[1].slice(5, 8), // Version 4
+    'a' + hexParts[2].slice(1, 4), // Variant
+    hexParts[2].slice(4, 8) + hexParts[3].slice(0, 8),
+  ].join('-');
+};
+
+/**
  * Generate a fallback daily challenge client-side
  * Uses date as seed for consistent puzzle across users
  */
@@ -119,8 +150,12 @@ const generateFallbackChallenge = (dateStr: string): DailyChallenge => {
   // Generate puzzle
   const puzzle = generatePuzzle(gridType, difficulty);
 
+  // Generate a deterministic UUID for the fallback challenge
+  // This ensures the ID is valid for database insertion
+  const fallbackId = generateDeterministicUUID(`fallback-daily-${dateStr}`);
+
   return {
-    id: `fallback-${dateStr}`,
+    id: fallbackId,
     challenge_date: dateStr,
     grid_type: gridType,
     difficulty,
@@ -180,11 +215,55 @@ export const getTodayCompletion = async (userId: string): Promise<DailyCompletio
 };
 
 /**
+ * Ensure a daily challenge exists in the database (for fallback challenges)
+ * This is needed because daily_completions has a foreign key to daily_challenges
+ */
+const ensureChallengeExists = async (challenge: DailyChallenge): Promise<boolean> => {
+  try {
+    // Check if challenge exists
+    const { data: existing } = await supabase
+      .from('daily_challenges')
+      .select('id')
+      .eq('challenge_date', challenge.challenge_date)
+      .single();
+
+    if (existing) {
+      return true; // Already exists
+    }
+
+    // Insert the fallback challenge
+    const { error } = await supabase
+      .from('daily_challenges')
+      .insert({
+        id: challenge.id,
+        challenge_date: challenge.challenge_date,
+        grid_type: challenge.grid_type,
+        difficulty: challenge.difficulty,
+        puzzle_grid: challenge.puzzle_grid,
+        solution_grid: challenge.solution_grid,
+      });
+
+    if (error) {
+      // Ignore unique constraint errors (race condition)
+      if (error.code !== '23505') {
+        console.error('Error inserting fallback challenge:', error);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error ensuring challenge exists:', error);
+    return false;
+  }
+};
+
+/**
  * Submit daily challenge completion
  */
 export const submitDailyCompletion = async (
   userId: string,
-  challengeId: string,
+  challenge: DailyChallenge,
   timeSeconds: number,
   mistakes: number,
   hintsUsed: number
@@ -198,12 +277,18 @@ export const submitDailyCompletion = async (
       return { success: false, error: 'Already completed today\'s challenge' };
     }
 
+    // Ensure the challenge exists in the database (for fallback challenges)
+    const challengeReady = await ensureChallengeExists(challenge);
+    if (!challengeReady) {
+      return { success: false, error: 'Failed to create challenge record' };
+    }
+
     // Insert completion
     const { error } = await supabase
       .from('daily_completions')
       .insert({
         user_id: userId,
-        challenge_id: challengeId,
+        challenge_id: challenge.id,
         challenge_date: today,
         time_seconds: timeSeconds,
         mistakes,

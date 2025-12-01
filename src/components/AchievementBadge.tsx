@@ -94,13 +94,13 @@ export const AchievementBadge: React.FC<AchievementBadgeProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: 70,
-    height: 85,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: 8,
+    paddingVertical: 8,
     paddingHorizontal: 4,
     borderWidth: 2,
     marginRight: 10,
+    flex: 1,
   },
   iconContainer: {
     width: 44,

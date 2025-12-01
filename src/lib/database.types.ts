@@ -106,6 +106,7 @@ export type Database = {
           completed_at: string;
           created_at: string;
           difficulty: string;
+          grid_type: string;
           hints_used: number | null;
           id: string;
           mistakes: number | null;
@@ -118,6 +119,7 @@ export type Database = {
           completed_at?: string;
           created_at?: string;
           difficulty: string;
+          grid_type?: string;
           hints_used?: number | null;
           id?: string;
           mistakes?: number | null;
@@ -130,6 +132,7 @@ export type Database = {
           completed_at?: string;
           created_at?: string;
           difficulty?: string;
+          grid_type?: string;
           hints_used?: number | null;
           id?: string;
           mistakes?: number | null;
@@ -457,6 +460,7 @@ export type NotificationPreferences = Database['public']['Tables']['notification
 export type NotificationPreferencesInsert = Database['public']['Tables']['notification_preferences']['Insert'];
 export type NotificationLog = Database['public']['Tables']['notification_logs']['Row'];
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'extreme' | 'insane' | 'inhuman';
+export type GridType = '6x6' | '9x9';
 
 // Chapter completions types (for replay feature)
 export interface ChapterCompletion {

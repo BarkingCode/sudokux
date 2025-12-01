@@ -24,12 +24,13 @@ import {
   syncOfflineQueue,
   checkAchievements,
   onChapterComplete,
+  checkDailyAchievements,
 } from './achievementService';
 import { getHeatmapGames, getWeeklyGames } from './gameAnalyticsService';
 
 // Types
 import type { GameSession, UserStats, Achievement } from '../lib/database.types';
-import type { AchievementId } from './gameCenter';
+import type { AchievementId } from '../data/achievements';
 
 /**
  * Unified StatsService class for backwards compatibility.
@@ -100,6 +101,13 @@ class StatsService {
    */
   async onChapterComplete(userId: string): Promise<void> {
     return onChapterComplete(userId);
+  }
+
+  /**
+   * Called when a daily challenge is completed
+   */
+  async checkDailyAchievements(userId: string): Promise<void> {
+    return checkDailyAchievements(userId);
   }
 
   /**

@@ -105,6 +105,7 @@ export default function FreeRunScreen() {
       mistakes: savedGame.mistakes,
       hintsUsed: savedGame.hintsUsed,
       notes: savedGame.notes,
+      history: savedGame.history || [],
     });
 
     router.push('/game');

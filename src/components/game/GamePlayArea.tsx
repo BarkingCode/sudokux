@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { SudokuBoard } from '../board/SudokuBoard';
@@ -13,13 +13,18 @@ import { BrutalistButton } from '../BrutalistButton';
 import { GRID_CONFIGS, GridConfig } from '../../game/types';
 import type { GameState } from '../../context/GameContext';
 
+const { width, height } = Dimensions.get('window');
+// Detect iPad for layout adjustments
+const isTablet = Platform.OS === 'ios' && (width >= 768 || (Math.min(width, height) / Math.max(width, height)) > 0.65);
+
 interface GamePlayAreaProps {
   gameState: GameState;
   selectedCell: { row: number; col: number } | null;
   notesMode: boolean;
   onCellPress: (row: number, col: number) => void;
   onNumberPress: (num: number) => void;
-  onErase: () => void;
+  onReset: () => void;
+  onUndo: () => void;
   onToggleNotes: () => void;
   onHint: () => void;
 }
@@ -57,7 +62,8 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
   notesMode,
   onCellPress,
   onNumberPress,
-  onErase,
+  onReset,
+  onUndo,
   onToggleNotes,
   onHint,
 }) => {
@@ -79,7 +85,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
   return (
     <>
       {/* Board */}
-      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.boardContainer}>
+      <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.boardContainer, isTablet && styles.boardContainerTablet]}>
         <SudokuBoard
           selectedCell={selectedCell}
           onCellPress={handleCellPress}
@@ -87,7 +93,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
       </Animated.View>
 
       {/* Number Pad - shows 1-6 for 6x6 or 1-9 for 9x9 */}
-      <Animated.View entering={FadeInDown.delay(300).springify()}>
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={isTablet && styles.numberPadTablet}>
         <NumberPad
           onNumberPress={onNumberPress}
           remainingCounts={remainingCounts}
@@ -96,17 +102,17 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
       </Animated.View>
 
       {/* Tools */}
-      <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.tools}>
+      <Animated.View entering={FadeInDown.delay(400).springify()} style={[styles.tools, isTablet && styles.toolsTablet]}>
         <BrutalistButton
           title="UNDO"
-          onPress={() => {}}
+          onPress={onUndo}
           variant="ghost"
           size="small"
           style={styles.toolBtn}
         />
         <BrutalistButton
-          title="ERASE"
-          onPress={onErase}
+          title="RESET"
+          onPress={onReset}
           variant="ghost"
           size="small"
           style={styles.toolBtn}
@@ -136,11 +142,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
+  boardContainerTablet: {
+    flex: 0,
+    paddingVertical: 16,
+    paddingTop: 8,
+  },
+  numberPadTablet: {
+    marginTop: 8,
+  },
   tools: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  toolsTablet: {
+    paddingHorizontal: 60,
+    paddingBottom: 24,
+    paddingTop: 16,
   },
   toolBtn: {
     minWidth: 70,

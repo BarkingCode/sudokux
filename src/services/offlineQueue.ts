@@ -5,7 +5,7 @@
  */
 
 import { saveData, loadData, STORAGE_KEYS } from '../utils/storage';
-import type { AchievementId } from './gameCenter';
+import type { AchievementId } from '../data/achievements';
 
 interface QueuedAchievement {
   achievementId: AchievementId;

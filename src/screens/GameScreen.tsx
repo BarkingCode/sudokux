@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator, AppState, AppStateStatus, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator, AppState, AppStateStatus, Platform, Dimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +19,7 @@ import { chapterService } from '../services/chapterService';
 import { getChapterPuzzle } from '../game/chapterPuzzles';
 import { statsService } from '../services/statsService';
 import { checkAchievements, onChapterComplete } from '../services/achievementService';
+import type { DailyChallenge } from '../services/dailyChallengeService';
 import { BrutalistText } from '../components/BrutalistText';
 import { SudokuBoard } from '../components/board/SudokuBoard';
 import { GamePlayArea } from '../components/game/GamePlayArea';
@@ -26,6 +27,10 @@ import { ViewOnlyStats } from '../components/game/ViewOnlyStats';
 import { GameModalsManager } from '../components/game/GameModalsManager';
 import { useGameModals, useUserId, useGameCompletion, getPuzzleDifficulty } from '../hooks';
 import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
+
+const { width, height } = Dimensions.get('window');
+// Detect iPad for layout adjustments
+const isTablet = Platform.OS === 'ios' && (width >= 768 || (Math.min(width, height) / Math.max(width, height)) > 0.65);
 
 interface GameProgress {
   currentPuzzle: number;
@@ -48,6 +53,8 @@ export default function GameScreen() {
     updateCell,
     addNote,
     removeNote,
+    undo,
+    resetBoard,
     pauseGame,
     resumeGame,
     getSmartHint,
@@ -188,15 +195,13 @@ export default function GameScreen() {
     }
   }, [selectedCell, gameState, updateCell, addNote, removeNote, notesMode, incrementMistakes]);
 
-  // Erase handler
-  const handleErase = useCallback(() => {
-    if (selectedCell && gameState && !gameState.isLoading) {
-      if (gameState.initialGrid[selectedCell.row][selectedCell.col] === 0) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        updateCell(selectedCell.row, selectedCell.col, 0);
-      }
+  // Reset board handler
+  const handleReset = useCallback(() => {
+    if (gameState && !gameState.isLoading) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      resetBoard();
     }
-  }, [selectedCell, gameState, updateCell]);
+  }, [gameState, resetBoard]);
 
   // Toggle notes mode
   const toggleNotesMode = useCallback(() => {
@@ -418,7 +423,7 @@ export default function GameScreen() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
+      {/* Header - stays at top */}
       <Animated.View entering={FadeIn.delay(100)} style={styles.header}>
         <Pressable
           onPress={() => {
@@ -452,34 +457,38 @@ export default function GameScreen() {
         </View>
       </Animated.View>
 
-      {isViewOnly ? (
-        <>
-          {/* Board (view-only) */}
-          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.boardContainer}>
-            <SudokuBoard selectedCell={null} onCellPress={() => {}} />
-          </Animated.View>
-          {/* View-Only Stats */}
-          <ViewOnlyStats
-            completionTime={completionTime}
-            completionMistakes={completionMistakes}
-            completionRank={completionRank}
-            isDaily={isDaily}
-            isChapter={isChapter}
-            onBack={() => router.back()}
+      {/* Game content wrapper - centers game area on iPad */}
+      <View style={[styles.gameContentWrapper, isTablet && styles.gameContentWrapperTablet]}>
+        {isViewOnly ? (
+          <>
+            {/* Board (view-only) */}
+            <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.boardContainer}>
+              <SudokuBoard selectedCell={null} onCellPress={() => {}} />
+            </Animated.View>
+            {/* View-Only Stats */}
+            <ViewOnlyStats
+              completionTime={completionTime}
+              completionMistakes={completionMistakes}
+              completionRank={completionRank}
+              isDaily={isDaily}
+              isChapter={isChapter}
+              onBack={() => router.back()}
+            />
+          </>
+        ) : (
+          <GamePlayArea
+            gameState={gameState}
+            selectedCell={selectedCell}
+            notesMode={notesMode}
+            onCellPress={handleCellPress}
+            onNumberPress={handleNumberPress}
+            onReset={handleReset}
+            onUndo={undo}
+            onToggleNotes={toggleNotesMode}
+            onHint={handleHint}
           />
-        </>
-      ) : (
-        <GamePlayArea
-          gameState={gameState}
-          selectedCell={selectedCell}
-          notesMode={notesMode}
-          onCellPress={handleCellPress}
-          onNumberPress={handleNumberPress}
-          onErase={handleErase}
-          onToggleNotes={toggleNotesMode}
-          onHint={handleHint}
-        />
-      )}
+        )}
+      </View>
 
       {/* Modals */}
       <GameModalsManager
@@ -497,8 +506,14 @@ export default function GameScreen() {
         currentHint={modals.currentHint}
         onApplyHint={handleApplyHint}
         dailyProps={{
-          challengeId,
-          challengeDate,
+          challenge: {
+            id: challengeId,
+            challenge_date: challengeDate,
+            grid_type: gameState.gridType,
+            difficulty: gameState.difficulty,
+            puzzle_grid: gameState.initialGrid,
+            solution_grid: gameState.solution,
+          } as DailyChallenge,
           userId: supabaseUserId,
           difficulty: gameState.difficulty,
           timeSeconds: gameState.timer || 0,
@@ -543,6 +558,12 @@ const styles = StyleSheet.create({
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  gameContentWrapper: {
+    flex: 1,
+  },
+  gameContentWrapperTablet: {
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

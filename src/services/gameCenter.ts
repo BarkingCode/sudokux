@@ -4,7 +4,8 @@
  * Handles iOS Game Center integration for:
  * - Player authentication
  * - Leaderboard submissions
- * - Achievement unlocking
+ *
+ * Note: Achievements are handled via Supabase only (not synced to Game Center)
  *
  * Only works on iOS. Falls back gracefully on other platforms.
  */
@@ -12,31 +13,12 @@
 import { Platform } from 'react-native';
 
 // Leaderboard IDs - Configure these in App Store Connect
+// Using single points-based leaderboard (Game Center handles country filtering automatically)
 export const LEADERBOARD_IDS = {
-  easy: 'com.boraalap.sudokux.leaderboard.easy',
-  medium: 'com.boraalap.sudokux.leaderboard.medium',
-  hard: 'com.boraalap.sudokux.leaderboard.hard',
-} as const;
-
-// Achievement IDs - Configure these in App Store Connect
-export const ACHIEVEMENT_IDS = {
-  first_puzzle: 'com.boraalap.sudokux.achievement.first_puzzle',
-  speed_demon: 'com.boraalap.sudokux.achievement.speed_demon',
-  perfectionist: 'com.boraalap.sudokux.achievement.perfectionist',
-  no_hints: 'com.boraalap.sudokux.achievement.no_hints',
-  streak_7: 'com.boraalap.sudokux.achievement.streak_7',
-  streak_30: 'com.boraalap.sudokux.achievement.streak_30',
-  games_10: 'com.boraalap.sudokux.achievement.games_10',
-  games_50: 'com.boraalap.sudokux.achievement.games_50',
-  games_100: 'com.boraalap.sudokux.achievement.games_100',
-  master_easy: 'com.boraalap.sudokux.achievement.master_easy',
-  master_medium: 'com.boraalap.sudokux.achievement.master_medium',
-  master_hard: 'com.boraalap.sudokux.achievement.master_hard',
-  chapter_complete: 'com.boraalap.sudokux.achievement.chapter_complete',
+  global: 'com.boraalap.sudokux.leaderboard.global',
 } as const;
 
 export type LeaderboardId = keyof typeof LEADERBOARD_IDS;
-export type AchievementId = keyof typeof ACHIEVEMENT_IDS;
 
 export interface GameCenterPlayer {
   playerId: string;
@@ -112,9 +94,9 @@ class GameCenterService {
   }
 
   /**
-   * Submit a score to a leaderboard
+   * Submit points to the global leaderboard
    */
-  async submitScore(difficulty: LeaderboardId, timeSeconds: number): Promise<boolean> {
+  async submitScore(points: number): Promise<boolean> {
     if (!this.isGameCenterAvailable() || !this.player?.isAuthenticated) {
       return false;
     }
@@ -122,15 +104,13 @@ class GameCenterService {
     const gc = loadGameCenter();
     if (!gc) return false;
 
-    const leaderboardId = LEADERBOARD_IDS[difficulty];
-
     try {
       await gc.submitScore({
-        leaderboardIdentifier: leaderboardId,
-        score: timeSeconds,
+        leaderboardIdentifier: LEADERBOARD_IDS.global,
+        score: points,
         context: 0,
       });
-      console.log(`Score ${timeSeconds}s submitted to ${difficulty} leaderboard`);
+      console.log(`Points ${points} submitted to global leaderboard`);
       return true;
     } catch (error) {
       console.warn('Failed to submit score:', error);
@@ -141,7 +121,7 @@ class GameCenterService {
   /**
    * Show the Game Center leaderboard UI
    */
-  async showLeaderboard(difficulty?: LeaderboardId): Promise<void> {
+  async showLeaderboard(): Promise<void> {
     if (!this.isGameCenterAvailable()) {
       return;
     }
@@ -150,61 +130,12 @@ class GameCenterService {
     if (!gc) return;
 
     try {
-      if (difficulty) {
-        await gc.showLeaderboard({
-          leaderboardIdentifier: LEADERBOARD_IDS[difficulty],
-          timeScope: 'AllTime',
-        });
-      } else {
-        await gc.showLeaderboards();
-      }
+      await gc.showLeaderboard({
+        leaderboardIdentifier: LEADERBOARD_IDS.global,
+        timeScope: 'AllTime',
+      });
     } catch (error) {
       console.warn('Failed to show leaderboard:', error);
-    }
-  }
-
-  /**
-   * Unlock an achievement
-   */
-  async unlockAchievement(achievementId: AchievementId, percentComplete: number = 100): Promise<boolean> {
-    if (!this.isGameCenterAvailable() || !this.player?.isAuthenticated) {
-      return false;
-    }
-
-    const gc = loadGameCenter();
-    if (!gc) return false;
-
-    const gcAchievementId = ACHIEVEMENT_IDS[achievementId];
-
-    try {
-      await gc.submitAchievement({
-        achievementIdentifier: gcAchievementId,
-        percentComplete,
-        showCompletionBanner: true,
-      });
-      console.log(`Achievement unlocked: ${achievementId}`);
-      return true;
-    } catch (error) {
-      console.warn('Failed to unlock achievement:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Show the Game Center achievements UI
-   */
-  async showAchievements(): Promise<void> {
-    if (!this.isGameCenterAvailable()) {
-      return;
-    }
-
-    const gc = loadGameCenter();
-    if (!gc) return;
-
-    try {
-      await gc.showAchievements();
-    } catch (error) {
-      console.warn('Failed to show achievements:', error);
     }
   }
 

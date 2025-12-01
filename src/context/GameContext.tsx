@@ -58,6 +58,7 @@ export interface SavedPuzzleWithProgress extends SavedPuzzleData {
   mistakes: number;
   hintsUsed: number;
   notes: Record<string, number[]>;
+  history?: string[]; // Undo history (optional for backwards compatibility)
 }
 
 interface GameContextType {
@@ -70,6 +71,7 @@ interface GameContextType {
   addNote: (row: number, col: number, value: number) => void;
   removeNote: (row: number, col: number, value: number) => void;
   undo: () => void;
+  resetBoard: () => void;
   pauseGame: () => void;
   resumeGame: () => void;
   getSmartHint: () => SmartHint | null;
@@ -248,7 +250,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Load a saved puzzle with existing progress (for resuming mid-game)
    */
   const loadSavedPuzzleWithProgress = useCallback((data: SavedPuzzleWithProgress) => {
-    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, hintsUsed, notes } = data;
+    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, hintsUsed, notes, history } = data;
 
     const newState: GameState = {
       ...createInitialState(gridType),
@@ -262,6 +264,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mistakes,
       hintsUsed,
       notes: { ...notes },
+      history: history || [], // Restore undo history
       isLoading: false,
       isPaused: false,
       conflictCells: findConflictCells(grid, gridType),
@@ -289,6 +292,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hintsUsed: currentState.hintsUsed,
       notes: currentState.notes,
       savedAt: new Date().toISOString(),
+      history: currentState.history,
     };
 
     await saveData(STORAGE_KEYS.CHAPTER_IN_PROGRESS, inProgress);
@@ -314,6 +318,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Can't modify initial cells
     if (gameState.initialGrid[row][col] !== 0) return;
 
+    // Record current grid state in history (for undo)
+    const snapshot = JSON.stringify(gameState.grid);
+    const newHistory = [...gameState.history, snapshot].slice(-50); // Keep last 50 moves
+
     // Deep copy grid
     const newGrid = gameState.grid.map(r => [...r]);
     newGrid[row][col] = value;
@@ -329,6 +337,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameState(prev => prev ? ({
       ...prev,
       grid: newGrid,
+      history: newHistory,
       conflictCells,
       isComplete,
     }) : null);
@@ -367,8 +376,35 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [gameState]);
 
   const undo = useCallback(() => {
-    // TODO: Implementation for undo
-  }, []);
+    if (!gameState || gameState.history.length === 0) return;
+
+    // Pop the last state from history
+    const history = [...gameState.history];
+    const previousGrid = JSON.parse(history.pop()!) as number[][];
+
+    setGameState(prev => prev ? ({
+      ...prev,
+      grid: previousGrid,
+      history,
+      conflictCells: findConflictCells(previousGrid, prev.gridType),
+      isComplete: false, // Undo can't result in completion
+    }) : null);
+  }, [gameState]);
+
+  const resetBoard = useCallback(() => {
+    if (!gameState) return;
+
+    // Reset grid to initial state, clear history and notes
+    const resetGrid = gameState.initialGrid.map(row => [...row]);
+    setGameState(prev => prev ? ({
+      ...prev,
+      grid: resetGrid,
+      history: [],
+      notes: {},
+      conflictCells: findConflictCells(resetGrid, prev.gridType),
+      isComplete: false,
+    }) : null);
+  }, [gameState]);
 
   const pauseGame = useCallback(() => {
     setGameState(prev => prev ? ({ ...prev, isPaused: true }) : null);
@@ -456,6 +492,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addNote,
       removeNote,
       undo,
+      resetBoard,
       pauseGame,
       resumeGame,
       getSmartHint,

@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
@@ -25,9 +25,12 @@ interface NumberPadProps {
   maxNumber?: number; // 6 for 6x6, 9 for 9x9
 }
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const PADDING = 20;
 const GAP = 10;
+
+// Detect iPad: iOS device with width >= 768 or aspect ratio closer to 1:1
+const isTablet = Platform.OS === 'ios' && (width >= 768 || (Math.min(width, height) / Math.max(width, height)) > 0.65);
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -38,6 +41,7 @@ interface NumberButtonProps {
   remaining?: number;
   buttonWidth: number;
   buttonHeight: number;
+  fontSize?: number;
 }
 
 const NumberButton: React.FC<NumberButtonProps> = ({
@@ -47,6 +51,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   remaining,
   buttonWidth,
   buttonHeight,
+  fontSize = 32,
 }) => {
   const { colors } = useTheme();
   const pressed = useSharedValue(0);
@@ -95,7 +100,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
       ]}
     >
       <BrutalistText
-        size={32}
+        size={fontSize}
         bold
         mono
         color={isComplete ? colors.muted : colors.text}
@@ -112,29 +117,40 @@ export const NumberPad: React.FC<NumberPadProps> = ({
   remainingCounts,
   maxNumber = 9,
 }) => {
-  // Split numbers into 2 rows
-  // 9x9: [1,2,3,4,5] and [6,7,8,9]
-  // 6x6: [1,2,3] and [4,5,6]
+  // On iPad: single row for all numbers
+  // On iPhone: split into 2 rows (9x9: [1-5], [6-9] | 6x6: [1-3], [4-6])
+  const useSingleRow = isTablet;
+
   const { row1, row2 } = useMemo(() => {
+    if (useSingleRow) {
+      // All numbers in a single row
+      const all = Array.from({ length: maxNumber }, (_, i) => i + 1);
+      return { row1: all, row2: [] };
+    }
+    // Split into 2 rows
     const splitPoint = Math.ceil(maxNumber / 2);
     const r1 = Array.from({ length: splitPoint }, (_, i) => i + 1);
     const r2 = Array.from({ length: maxNumber - splitPoint }, (_, i) => splitPoint + i + 1);
     return { row1: r1, row2: r2 };
-  }, [maxNumber]);
+  }, [maxNumber, useSingleRow]);
 
-  // Calculate button dimensions for the larger row (row1)
-  const { buttonWidth, buttonHeight } = useMemo(() => {
+  // Calculate button dimensions
+  const { buttonWidth, buttonHeight, fontSize } = useMemo(() => {
     const columnsInRow1 = row1.length;
-    const availableWidth = width - PADDING * 2 - GAP * (columnsInRow1 - 1);
+    const padding = isTablet ? 40 : PADDING; // More padding on iPad
+    const gap = isTablet ? 8 : GAP;
+    const availableWidth = width - padding * 2 - gap * (columnsInRow1 - 1);
     const w = availableWidth / columnsInRow1;
-    const h = w * 0.85; // Slightly wider than tall
-    return { buttonWidth: w, buttonHeight: h };
+    // On iPad with single row, make buttons more compact
+    const h = isTablet ? Math.min(w * 0.8, 60) : w * 0.85;
+    const size = isTablet ? 24 : 32;
+    return { buttonWidth: w, buttonHeight: h, fontSize: size };
   }, [row1.length]);
 
   return (
-    <View style={styles.container}>
-      {/* Row 1 */}
-      <View style={styles.numbersRow}>
+    <View style={[styles.container, isTablet && styles.containerTablet]}>
+      {/* Row 1 (or single row on iPad) */}
+      <View style={[styles.numbersRow, isTablet && styles.numbersRowTablet]}>
         {row1.map((num) => (
           <NumberButton
             key={num}
@@ -144,24 +160,28 @@ export const NumberPad: React.FC<NumberPadProps> = ({
             remaining={remainingCounts?.[num]}
             buttonWidth={buttonWidth}
             buttonHeight={buttonHeight}
+            fontSize={fontSize}
           />
         ))}
       </View>
 
-      {/* Row 2 */}
-      <View style={[styles.numbersRow, styles.row2]}>
-        {row2.map((num) => (
-          <NumberButton
-            key={num}
-            num={num}
-            onPress={() => onNumberPress(num)}
-            disabled={disabled}
-            remaining={remainingCounts?.[num]}
-            buttonWidth={buttonWidth}
-            buttonHeight={buttonHeight}
-          />
-        ))}
-      </View>
+      {/* Row 2 (only on iPhone) */}
+      {row2.length > 0 && (
+        <View style={[styles.numbersRow, styles.row2]}>
+          {row2.map((num) => (
+            <NumberButton
+              key={num}
+              num={num}
+              onPress={() => onNumberPress(num)}
+              disabled={disabled}
+              remaining={remainingCounts?.[num]}
+              buttonWidth={buttonWidth}
+              buttonHeight={buttonHeight}
+              fontSize={fontSize}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 };
@@ -171,10 +191,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: PADDING,
     paddingVertical: 12,
   },
+  containerTablet: {
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+  },
   numbersRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: GAP,
+  },
+  numbersRowTablet: {
+    gap: 8,
   },
   row2: {
     marginTop: GAP,

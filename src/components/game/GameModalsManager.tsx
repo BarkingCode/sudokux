@@ -10,10 +10,10 @@ import { FreeRunCompletionModal } from '../FreeRunCompletionModal';
 import { SmartHintModal } from '../SmartHintModal';
 import type { SmartHint } from '../../game/hintAnalyzer';
 import type { Difficulty, GridType } from '../../context/GameContext';
+import type { DailyChallenge } from '../../services/dailyChallengeService';
 
 interface DailyModalProps {
-  challengeId: string;
-  challengeDate: string;
+  challenge: DailyChallenge;
   userId: string | null;
   difficulty: Difficulty;
   timeSeconds: number;
@@ -91,8 +91,7 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
         <DailyCompletionModal
           visible={showDailyModal}
           onClose={onCloseDailyModal}
-          challengeId={dailyProps.challengeId}
-          challengeDate={dailyProps.challengeDate}
+          challenge={dailyProps.challenge}
           userId={dailyProps.userId}
           difficulty={dailyProps.difficulty}
           timeSeconds={dailyProps.timeSeconds}

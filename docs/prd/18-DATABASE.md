@@ -241,33 +241,45 @@ $$;
 
 ### Auto-update Stats on Completion
 
-Triggers on all three completion tables to recalculate user stats:
+A single trigger function handles stats recalculation for all game completion tables. This ensures `user_stats` always reflects accurate counts from `game_sessions`, `chapter_completions`, and `daily_completions`.
+
+**Important:** Only ONE trigger per table should update stats to avoid double-counting issues.
 
 ```sql
--- Trigger function
-CREATE OR REPLACE FUNCTION update_user_stats_on_completion()
+-- Trigger function (calls recalculate_user_stats which aggregates from all sources)
+CREATE OR REPLACE FUNCTION update_user_points_on_completion()
 RETURNS TRIGGER AS $$
 BEGIN
-  PERFORM recalculate_user_stats(NEW.user_id);
+  -- Recalculate all user stats (includes points)
+  PERFORM public.recalculate_user_stats(NEW.user_id);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 -- game_sessions trigger
-CREATE TRIGGER trg_game_sessions_stats
+CREATE TRIGGER trigger_update_points
 AFTER INSERT ON game_sessions
-FOR EACH ROW EXECUTE FUNCTION update_user_stats_on_completion();
+FOR EACH ROW EXECUTE FUNCTION update_user_points_on_completion();
 
 -- chapter_completions trigger
-CREATE TRIGGER trg_chapter_completions_stats
+CREATE TRIGGER trigger_update_points_chapter
 AFTER INSERT ON chapter_completions
-FOR EACH ROW EXECUTE FUNCTION update_user_stats_on_completion();
+FOR EACH ROW EXECUTE FUNCTION update_user_points_on_completion();
 
 -- daily_completions trigger
-CREATE TRIGGER trg_daily_completions_stats
+CREATE TRIGGER trigger_update_points_daily
 AFTER INSERT ON daily_completions
-FOR EACH ROW EXECUTE FUNCTION update_user_stats_on_completion();
+FOR EACH ROW EXECUTE FUNCTION update_user_points_on_completion();
 ```
+
+### Stats Calculation Strategy
+
+The `recalculate_user_stats()` function counts records from all three tables:
+- `game_sessions` - Free run games
+- `chapter_completions` - Chapter mode games
+- `daily_completions` - Daily challenge games
+
+This approach ensures data integrity by always deriving `total_games` from actual records rather than incremental updates.
 
 ## Row Level Security (RLS)
 

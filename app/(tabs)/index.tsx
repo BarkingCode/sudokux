@@ -359,6 +359,7 @@ export default function ChaptersScreen() {
           mistakes: inProgressData.mistakes,
           hintsUsed: inProgressData.hintsUsed,
           notes: inProgressData.notes,
+          history: inProgressData.history || [],
         });
       } else {
         // Generate fresh deterministic puzzle

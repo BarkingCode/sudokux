@@ -9,7 +9,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { Difficulty } from '../lib/database.types';
-import { gameCenterService, type LeaderboardId } from './gameCenter';
+import { gameCenterService } from './gameCenter';
 
 export interface LeaderboardEntry {
   userId: string;
@@ -163,19 +163,19 @@ class LeaderboardService {
   }
 
   /**
-   * Submit score to both Supabase leaderboard and Game Center
+   * Submit points to Game Center leaderboard
    * Note: Supabase score is automatically updated via stats trigger
    * This method is for explicit Game Center submission
    */
-  async submitToGameCenter(difficulty: LeaderboardId, timeSeconds: number): Promise<boolean> {
-    return gameCenterService.submitScore(difficulty, timeSeconds);
+  async submitToGameCenter(points: number): Promise<boolean> {
+    return gameCenterService.submitScore(points);
   }
 
   /**
    * Show native Game Center leaderboard UI
    */
-  async showGameCenterLeaderboard(difficulty?: LeaderboardId): Promise<void> {
-    await gameCenterService.showLeaderboard(difficulty);
+  async showGameCenterLeaderboard(): Promise<void> {
+    await gameCenterService.showLeaderboard();
   }
 }
 

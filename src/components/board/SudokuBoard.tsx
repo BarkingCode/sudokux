@@ -4,15 +4,23 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Cell } from './Cell';
 import { useTheme } from '../../context/ThemeContext';
 import { useGame } from '../../context/GameContext';
 import { GRID_CONFIGS } from '../../game/types';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const BOARD_PADDING = 20;
-const BOARD_SIZE = width - BOARD_PADDING * 2;
+
+// Detect iPad for layout adjustments
+const isTablet = Platform.OS === 'ios' && (width >= 768 || (Math.min(width, height) / Math.max(width, height)) > 0.65);
+
+// On iPad, use a larger board size (up to 580px for comfortable viewing)
+const MAX_BOARD_SIZE_TABLET = 580;
+const BOARD_SIZE = isTablet
+  ? Math.min(width - BOARD_PADDING * 2, MAX_BOARD_SIZE_TABLET)
+  : width - BOARD_PADDING * 2;
 
 interface SudokuBoardProps {
   selectedCell: { row: number; col: number } | null;

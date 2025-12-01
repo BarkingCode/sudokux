@@ -84,13 +84,11 @@ jest.mock('@shopify/react-native-skia', () => ({
   useTiming: jest.fn(() => ({ current: 0 })),
 }));
 
-// Mock react-native-game-center
+// Mock react-native-game-center (authentication and leaderboard only - achievements handled by Supabase)
 jest.mock('react-native-game-center', () => ({
   authenticate: jest.fn(() => Promise.resolve({ isAuthenticated: false })),
   submitScore: jest.fn(() => Promise.resolve()),
-  unlockAchievement: jest.fn(() => Promise.resolve()),
   showLeaderboard: jest.fn(() => Promise.resolve()),
-  showAchievements: jest.fn(() => Promise.resolve()),
   getPlayerId: jest.fn(() => Promise.resolve(null)),
 }));
 

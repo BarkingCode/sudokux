@@ -5,18 +5,20 @@
  * Uses React Native Skia for efficient rendering of many small rectangles.
  */
 
-import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, Pressable } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, ScrollView, Dimensions, Platform, LayoutChangeEvent } from 'react-native';
 import { Canvas, Rect } from '@shopify/react-native-skia';
 import { BrutalistText } from './BrutalistText';
 import { useTheme } from '../context/ThemeContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const CELL_SIZE = 12;
-const CELL_GAP = 3;
-const WEEKS_TO_SHOW = 16; // ~4 months
+// Detect iPad for layout adjustments
+const isTablet = Platform.OS === 'ios' && (SCREEN_WIDTH >= 768 || (Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) / Math.max(SCREEN_WIDTH, SCREEN_HEIGHT)) > 0.65);
+
 const DAYS_IN_WEEK = 7;
+const DAY_LABEL_WIDTH = 30;
+const CONTAINER_PADDING = 16;
 
 interface DayData {
   date: string; // YYYY-MM-DD
@@ -51,6 +53,35 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ data, onDayPress }) => {
   const { colors, isDark } = useTheme();
+  const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 48); // Default with padding
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    setContainerWidth(width);
+  };
+
+  // Calculate dynamic sizing based on container width
+  const { cellSize, cellGap, weeksToShow } = useMemo(() => {
+    // Available width for the grid (subtract padding and day labels)
+    const availableWidth = containerWidth - DAY_LABEL_WIDTH - (CONTAINER_PADDING * 2);
+
+    // Desired cell size range
+    const minCellSize = 10;
+    const maxCellSize = isTablet ? 14 : 12;
+    const gap = 3;
+
+    // Calculate how many weeks can fit with the desired cell size
+    const cellPlusGap = maxCellSize + gap;
+    const maxWeeks = Math.floor(availableWidth / cellPlusGap);
+
+    // Clamp to reasonable range (12-26 weeks = ~3-6 months)
+    const weeks = Math.max(12, Math.min(26, maxWeeks));
+
+    // Recalculate cell size to fill the space exactly
+    const finalCellSize = Math.max(minCellSize, Math.min(maxCellSize, (availableWidth / weeks) - gap));
+
+    return { cellSize: finalCellSize, cellGap: gap, weeksToShow: weeks };
+  }, [containerWidth]);
 
   // Organize data into weeks
   const { weeks, monthLabels, totalGames } = useMemo(() => {
@@ -69,7 +100,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ data, onDayPre
 
     // Start from today and go back
     const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - (WEEKS_TO_SHOW * 7));
+    startDate.setDate(startDate.getDate() - (weeksToShow * 7));
 
     // Adjust to start on Sunday
     const dayOffset = startDate.getDay();
@@ -118,13 +149,15 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ data, onDayPre
     });
 
     return { weeks, monthLabels: labels, totalGames: total };
-  }, [data]);
+  }, [data, weeksToShow]);
 
-  const canvasWidth = weeks.length * (CELL_SIZE + CELL_GAP);
-  const canvasHeight = DAYS_IN_WEEK * (CELL_SIZE + CELL_GAP);
+  const canvasWidth = weeks.length * (cellSize + cellGap);
+  const canvasHeight = DAYS_IN_WEEK * (cellSize + cellGap);
+
+  const dayLabelHeight = cellSize;
 
   return (
-    <View style={[styles.container, { borderColor: colors.primary }]}>
+    <View style={[styles.container, { borderColor: colors.primary }]} onLayout={handleLayout}>
       <View style={[styles.header, { borderBottomColor: colors.primary }]}>
         <BrutalistText size={12} mono uppercase muted>
           Activity
@@ -134,85 +167,79 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ data, onDayPre
         </BrutalistText>
       </View>
 
-      {/* Month labels */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View>
-          {/* Month row */}
-          <View style={[styles.monthRow, { width: canvasWidth + 30 }]}>
-            {monthLabels.map((label, index) => (
-              <BrutalistText
+      {/* Calendar content - no scroll needed since it fits */}
+      <View style={styles.contentContainer}>
+        {/* Month row */}
+        <View style={[styles.monthRow, { width: canvasWidth + DAY_LABEL_WIDTH }]}>
+          {monthLabels.map((label, index) => (
+            <BrutalistText
+              key={index}
+              size={9}
+              mono
+              muted
+              style={{
+                position: 'absolute',
+                left: DAY_LABEL_WIDTH + label.weekIndex * (cellSize + cellGap),
+              }}
+            >
+              {label.month}
+            </BrutalistText>
+          ))}
+        </View>
+
+        {/* Calendar grid */}
+        <View style={styles.gridContainer}>
+          {/* Day labels */}
+          <View style={[styles.dayLabels, { height: canvasHeight - cellGap }]}>
+            <BrutalistText size={8} mono muted style={[styles.dayLabel, { height: dayLabelHeight, lineHeight: dayLabelHeight }]}>
+              Mon
+            </BrutalistText>
+            <BrutalistText size={8} mono muted style={[styles.dayLabel, { height: dayLabelHeight, lineHeight: dayLabelHeight }]}>
+              Wed
+            </BrutalistText>
+            <BrutalistText size={8} mono muted style={[styles.dayLabel, { height: dayLabelHeight, lineHeight: dayLabelHeight }]}>
+              Fri
+            </BrutalistText>
+          </View>
+
+          {/* Canvas with cells */}
+          <Canvas style={{ width: canvasWidth, height: canvasHeight }}>
+            {weeks.map((week, weekIndex) =>
+              week.map((day) => (
+                <Rect
+                  key={day.date}
+                  x={weekIndex * (cellSize + cellGap)}
+                  y={day.dayOfWeek * (cellSize + cellGap)}
+                  width={cellSize}
+                  height={cellSize}
+                  color={getHeatmapColor(day.count, isDark)}
+                />
+              ))
+            )}
+          </Canvas>
+        </View>
+
+        {/* Legend */}
+        <View style={styles.legend}>
+          <BrutalistText size={9} mono muted>
+            Less
+          </BrutalistText>
+          <View style={styles.legendCells}>
+            {[0, 1, 2, 4, 5].map((level, index) => (
+              <View
                 key={index}
-                size={9}
-                mono
-                muted
-                style={{
-                  position: 'absolute',
-                  left: 30 + label.weekIndex * (CELL_SIZE + CELL_GAP),
-                }}
-              >
-                {label.month}
-              </BrutalistText>
+                style={[
+                  styles.legendCell,
+                  { backgroundColor: getHeatmapColor(level, isDark) },
+                ]}
+              />
             ))}
           </View>
-
-          {/* Calendar grid */}
-          <View style={styles.gridContainer}>
-            {/* Day labels */}
-            <View style={styles.dayLabels}>
-              <BrutalistText size={8} mono muted style={styles.dayLabel}>
-                Mon
-              </BrutalistText>
-              <BrutalistText size={8} mono muted style={styles.dayLabel}>
-                Wed
-              </BrutalistText>
-              <BrutalistText size={8} mono muted style={styles.dayLabel}>
-                Fri
-              </BrutalistText>
-            </View>
-
-            {/* Canvas with cells */}
-            <Canvas style={{ width: canvasWidth, height: canvasHeight }}>
-              {weeks.map((week, weekIndex) =>
-                week.map((day, dayIndex) => (
-                  <Rect
-                    key={day.date}
-                    x={weekIndex * (CELL_SIZE + CELL_GAP)}
-                    y={day.dayOfWeek * (CELL_SIZE + CELL_GAP)}
-                    width={CELL_SIZE}
-                    height={CELL_SIZE}
-                    color={getHeatmapColor(day.count, isDark)}
-                  />
-                ))
-              )}
-            </Canvas>
-          </View>
-
-          {/* Legend */}
-          <View style={styles.legend}>
-            <BrutalistText size={9} mono muted>
-              Less
-            </BrutalistText>
-            <View style={styles.legendCells}>
-              {[0, 1, 2, 4, 5].map((level, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.legendCell,
-                    { backgroundColor: getHeatmapColor(level, isDark) },
-                  ]}
-                />
-              ))}
-            </View>
-            <BrutalistText size={9} mono muted>
-              More
-            </BrutalistText>
-          </View>
+          <BrutalistText size={9} mono muted>
+            More
+          </BrutalistText>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -248,26 +275,23 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 2,
   },
-  scrollContent: {
-    padding: 16,
+  contentContainer: {
+    padding: CONTAINER_PADDING,
   },
   monthRow: {
     height: 16,
     marginBottom: 4,
-    marginLeft: 30,
   },
   gridContainer: {
     flexDirection: 'row',
   },
   dayLabels: {
-    width: 26,
+    width: DAY_LABEL_WIDTH,
     justifyContent: 'space-between',
     paddingRight: 4,
-    height: DAYS_IN_WEEK * (CELL_SIZE + CELL_GAP) - CELL_GAP,
   },
   dayLabel: {
-    height: CELL_SIZE,
-    lineHeight: CELL_SIZE,
+    // Dynamic height and lineHeight set inline
   },
   legend: {
     flexDirection: 'row',

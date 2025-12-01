@@ -11,10 +11,10 @@ import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { BrutalistText } from '../src/components/BrutalistText';
-import { AchievementCard } from '../src/components/AchievementCard';
+import { AchievementCard, type AchievementProgress } from '../src/components/AchievementCard';
 import { useTheme } from '../src/context/ThemeContext';
 import { statsService } from '../src/services/statsService';
-import { gameCenterService } from '../src/services/gameCenter';
+import { getAllAchievementProgress } from '../src/services/achievementProgressService';
 import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
 import {
   ACHIEVEMENTS,
@@ -30,6 +30,7 @@ export default function AchievementsScreen() {
   const { colors, isDark } = useTheme();
   const [userId, setUserId] = useState<string | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
+  const [achievementProgress, setAchievementProgress] = useState<Map<string, AchievementProgress>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
@@ -53,8 +54,13 @@ export default function AchievementsScreen() {
         setUserId(currentUserId);
 
         if (currentUserId) {
-          const achievements = await statsService.getAchievements(currentUserId);
+          // Fetch achievements and progress in parallel
+          const [achievements, progress] = await Promise.all([
+            statsService.getAchievements(currentUserId),
+            getAllAchievementProgress(currentUserId, ACHIEVEMENTS),
+          ]);
           setUnlockedAchievements(achievements);
+          setAchievementProgress(progress);
         }
       } catch (error) {
         console.error('Error loading achievements:', error);
@@ -74,8 +80,13 @@ export default function AchievementsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const achievements = await statsService.getAchievements(userId);
+      // Fetch achievements and progress in parallel
+      const [achievements, progress] = await Promise.all([
+        statsService.getAchievements(userId),
+        getAllAchievementProgress(userId, ACHIEVEMENTS),
+      ]);
       setUnlockedAchievements(achievements);
+      setAchievementProgress(progress);
     } catch (error) {
       console.error('Error refreshing achievements:', error);
     } finally {
@@ -98,10 +109,12 @@ export default function AchievementsScreen() {
     [unlockedAchievements]
   );
 
-  const handleShowGameCenter = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await gameCenterService.showAchievements();
-  }, []);
+  const getProgress = useCallback(
+    (achievementId: string): AchievementProgress | undefined => {
+      return achievementProgress.get(achievementId);
+    },
+    [achievementProgress]
+  );
 
   const filteredAchievements =
     selectedCategory === 'all'
@@ -112,7 +125,7 @@ export default function AchievementsScreen() {
   const totalCount = ACHIEVEMENTS.length;
   const progressPercent = Math.round((unlockedCount / totalCount) * 100);
 
-  const categories: (CategoryType | 'all')[] = ['all', 'milestone', 'skill', 'streak', 'mastery'];
+  const categories: (CategoryType | 'all')[] = ['all', 'milestone', 'skill', 'streak', 'mastery', 'daily', 'grid'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -241,20 +254,9 @@ export default function AchievementsScreen() {
               isUnlocked={isAchievementUnlocked(achievement.id)}
               unlockedAt={getUnlockedDate(achievement.id)}
               index={index}
+              progress={getProgress(achievement.id)}
             />
           ))}
-
-          {/* Game Center Button */}
-          {gameCenterService.isGameCenterAvailable() && (
-            <Pressable
-              onPress={handleShowGameCenter}
-              style={[styles.gameCenterButton, { borderColor: colors.muted }]}
-            >
-              <BrutalistText size={14} mono muted>
-                View in Game Center
-              </BrutalistText>
-            </Pressable>
-          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -328,11 +330,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
-  },
-  gameCenterButton: {
-    borderWidth: 2,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
   },
 });

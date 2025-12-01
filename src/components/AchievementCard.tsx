@@ -1,6 +1,7 @@
 /**
  * Achievement card component displaying a single achievement.
  * Shows locked/unlocked state with brutalist styling.
+ * Displays progress bar for locked achievements with trackable progress.
  */
 
 import React from 'react';
@@ -10,11 +11,19 @@ import { BrutalistText } from './BrutalistText';
 import { useTheme } from '../context/ThemeContext';
 import type { AchievementDefinition } from '../data/achievements';
 
+export interface AchievementProgress {
+  current: number;
+  target: number;
+  percentage: number;
+  showProgress: boolean;
+}
+
 interface AchievementCardProps {
   achievement: AchievementDefinition;
   isUnlocked: boolean;
   unlockedAt?: string;
   index?: number;
+  progress?: AchievementProgress;
 }
 
 export const AchievementCard: React.FC<AchievementCardProps> = ({
@@ -22,6 +31,7 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({
   isUnlocked,
   unlockedAt,
   index = 0,
+  progress,
 }) => {
   const { colors } = useTheme();
 
@@ -33,6 +43,9 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({
       year: 'numeric',
     });
   };
+
+  // Show progress bar for locked achievements with trackable progress
+  const showProgressBar = !isUnlocked && progress?.showProgress && progress.target > 0;
 
   return (
     <Animated.View
@@ -85,6 +98,36 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({
             ? 'Complete a secret challenge to unlock'
             : achievement.description}
         </BrutalistText>
+
+        {/* Progress Bar for Locked Achievements */}
+        {showProgressBar && (
+          <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  backgroundColor: colors.highlight,
+                  borderColor: colors.muted,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: colors.muted,
+                    width: `${progress.percentage}%`,
+                  },
+                ]}
+              />
+            </View>
+            <BrutalistText size={10} mono muted style={styles.progressText}>
+              {progress.current}/{progress.target}
+            </BrutalistText>
+          </View>
+        )}
+
+        {/* Unlocked Date */}
         {isUnlocked && unlockedAt && (
           <BrutalistText size={10} mono muted style={styles.date}>
             Unlocked {formatDate(unlockedAt)}
@@ -136,5 +179,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginLeft: 12,
+  },
+  progressContainer: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    borderWidth: 2,
+    // No border radius for brutalist style
+  },
+  progressFill: {
+    height: '100%',
+  },
+  progressText: {
+    minWidth: 40,
   },
 });

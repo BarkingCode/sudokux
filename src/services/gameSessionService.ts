@@ -9,6 +9,7 @@ import type {
   GameSession,
   GameSessionInsert,
   Difficulty,
+  GridType,
 } from '../lib/database.types';
 
 export interface GameResult {
@@ -18,6 +19,7 @@ export interface GameResult {
   mistakes: number;
   hintsUsed: number;
   completed: boolean;
+  gridType?: GridType;
 }
 
 /**
@@ -36,6 +38,7 @@ export async function recordGameSession(
       mistakes: result.mistakes,
       hints_used: result.hintsUsed,
       completed: result.completed,
+      grid_type: result.gridType || '9x9',
     };
 
     const { data, error } = await supabase
@@ -118,6 +121,7 @@ export async function getGameHistory(
           completed_at: ch.completed_at,
           created_at: ch.created_at,
           puzzle_id: `chapter-${ch.puzzle_number}`,
+          grid_type: '9x9', // Chapters are always 9x9
         });
       }
     }
@@ -149,6 +153,7 @@ export async function getGameHistory(
           completed_at: dc.completed_at,
           created_at: dc.completed_at,
           puzzle_id: `daily-${dc.challenge_id}`,
+          grid_type: '9x9', // Daily challenges are always 9x9
         });
       }
     }

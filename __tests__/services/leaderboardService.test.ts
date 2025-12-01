@@ -328,17 +328,17 @@ describe('leaderboardService', () => {
   // ============ submitToGameCenter ============
 
   describe('submitToGameCenter', () => {
-    it('should submit score to Game Center', async () => {
-      const result = await leaderboardService.submitToGameCenter('easy', 180);
+    it('should submit points to Game Center', async () => {
+      const result = await leaderboardService.submitToGameCenter(1500);
 
-      expect(gameCenterService.submitScore).toHaveBeenCalledWith('easy', 180);
+      expect(gameCenterService.submitScore).toHaveBeenCalledWith(1500);
       expect(result).toBe(true);
     });
 
     it('should return Game Center result', async () => {
       (gameCenterService.submitScore as jest.Mock).mockResolvedValueOnce(false);
 
-      const result = await leaderboardService.submitToGameCenter('medium', 300);
+      const result = await leaderboardService.submitToGameCenter(2000);
 
       expect(result).toBe(false);
     });
@@ -347,16 +347,10 @@ describe('leaderboardService', () => {
   // ============ showGameCenterLeaderboard ============
 
   describe('showGameCenterLeaderboard', () => {
-    it('should show Game Center leaderboard with difficulty', async () => {
-      await leaderboardService.showGameCenterLeaderboard('hard');
-
-      expect(gameCenterService.showLeaderboard).toHaveBeenCalledWith('hard');
-    });
-
-    it('should show Game Center leaderboard without difficulty', async () => {
+    it('should show Game Center leaderboard', async () => {
       await leaderboardService.showGameCenterLeaderboard();
 
-      expect(gameCenterService.showLeaderboard).toHaveBeenCalledWith(undefined);
+      expect(gameCenterService.showLeaderboard).toHaveBeenCalled();
     });
   });
 });

@@ -39,6 +39,7 @@ export interface ChapterInProgress {
   hintsUsed: number;
   notes: Record<string, number[]>;
   savedAt: string;
+  history?: string[]; // Undo history (optional for backwards compatibility)
 }
 
 class ChapterService {

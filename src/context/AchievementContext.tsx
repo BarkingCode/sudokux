@@ -7,9 +7,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AchievementToast } from '../components/AchievementToast';
 import { Confetti } from '../components/Confetti';
-import { getAchievementById, type AchievementDefinition } from '../data/achievements';
+import { getAchievementById, type AchievementDefinition, type AchievementId } from '../data/achievements';
 import { achievementEvents } from '../services/achievementEvents';
-import type { AchievementId } from '../services/gameCenter';
 
 // Milestone achievements trigger confetti animation
 const MILESTONE_ACHIEVEMENTS: AchievementId[] = [

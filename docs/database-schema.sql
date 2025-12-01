@@ -301,3 +301,63 @@ CREATE POLICY "Allow insert on chapter_completions" ON public.chapter_completion
 
 CREATE POLICY "Allow update on chapter_completions" ON public.chapter_completions
   FOR UPDATE USING (true);
+
+-- ============================================
+-- DAILY CHALLENGES TABLE
+-- ============================================
+-- Stores daily challenge puzzles (one per day, shared by all users)
+
+CREATE TABLE IF NOT EXISTS public.daily_challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_date DATE NOT NULL UNIQUE,
+  grid_type TEXT NOT NULL DEFAULT '9x9' CHECK (grid_type IN ('6x6', '9x9')),
+  difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard', 'extreme', 'insane', 'inhuman')),
+  puzzle_grid JSONB NOT NULL,
+  solution_grid JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Index for fast date lookups
+CREATE INDEX IF NOT EXISTS idx_daily_challenges_date ON public.daily_challenges(challenge_date);
+
+-- Enable RLS
+ALTER TABLE public.daily_challenges ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Allow public read on daily_challenges" ON public.daily_challenges
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow insert on daily_challenges" ON public.daily_challenges
+  FOR INSERT WITH CHECK (true);
+
+-- ============================================
+-- DAILY COMPLETIONS TABLE
+-- ============================================
+-- Stores user completions of daily challenges
+
+CREATE TABLE IF NOT EXISTS public.daily_completions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  challenge_id UUID REFERENCES public.daily_challenges(id) ON DELETE CASCADE NOT NULL,
+  challenge_date DATE NOT NULL,
+  time_seconds INTEGER NOT NULL CHECK (time_seconds >= 0),
+  mistakes INTEGER DEFAULT 0 CHECK (mistakes >= 0),
+  hints_used INTEGER DEFAULT 0 CHECK (hints_used >= 0),
+  completed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(user_id, challenge_date) -- One completion per day per user
+);
+
+-- Indexes for leaderboard and user queries
+CREATE INDEX IF NOT EXISTS idx_daily_completions_user_id ON public.daily_completions(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_completions_challenge_date ON public.daily_completions(challenge_date);
+CREATE INDEX IF NOT EXISTS idx_daily_completions_time ON public.daily_completions(time_seconds);
+
+-- Enable RLS
+ALTER TABLE public.daily_completions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Allow public read on daily_completions" ON public.daily_completions
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow insert on daily_completions" ON public.daily_completions
+  FOR INSERT WITH CHECK (true);
