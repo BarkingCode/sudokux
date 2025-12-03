@@ -4,6 +4,32 @@
 -- Run this in your Supabase SQL Editor
 
 -- ============================================
+-- ADD grid_type COLUMN TO chapter_completions
+-- ============================================
+-- Must run FIRST before the function uses the column
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'chapter_completions' AND column_name = 'grid_type'
+  ) THEN
+    -- Add the grid_type column
+    ALTER TABLE chapter_completions
+    ADD COLUMN grid_type TEXT DEFAULT '9x9' CHECK (grid_type IN ('6x6', '9x9'));
+
+    -- Update the unique constraint to include grid_type
+    -- This allows separate progress tracking for 6x6 and 9x9
+    ALTER TABLE chapter_completions
+    DROP CONSTRAINT IF EXISTS chapter_completions_user_id_puzzle_number_key;
+
+    ALTER TABLE chapter_completions
+    ADD CONSTRAINT chapter_completions_user_id_puzzle_number_grid_type_key
+    UNIQUE (user_id, puzzle_number, grid_type);
+  END IF;
+END $$;
+
+-- ============================================
 -- UPDATE calculate_user_points FUNCTION
 -- ============================================
 -- Points for 9x9: easy=10, medium=25, hard=50, extreme=100, insane=200, inhuman=500
@@ -46,7 +72,7 @@ AS $$
     )
     +
     (
-      -- Points from chapter_completions (always 9x9 for now, add grid_type column if needed)
+      -- Points from chapter_completions
       SELECT COALESCE(SUM(
         CASE
           WHEN grid_type = '6x6' THEN
@@ -108,32 +134,6 @@ AS $$
     0
   )::INTEGER;
 $$;
-
--- ============================================
--- ADD grid_type COLUMN TO chapter_completions
--- ============================================
--- Only run if column doesn't exist
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'chapter_completions' AND column_name = 'grid_type'
-  ) THEN
-    -- Add the grid_type column
-    ALTER TABLE chapter_completions
-    ADD COLUMN grid_type TEXT DEFAULT '9x9' CHECK (grid_type IN ('6x6', '9x9'));
-
-    -- Update the unique constraint to include grid_type
-    -- This allows separate progress tracking for 6x6 and 9x9
-    ALTER TABLE chapter_completions
-    DROP CONSTRAINT IF EXISTS chapter_completions_user_id_puzzle_number_key;
-
-    ALTER TABLE chapter_completions
-    ADD CONSTRAINT chapter_completions_user_id_puzzle_number_grid_type_key
-    UNIQUE (user_id, puzzle_number, grid_type);
-  END IF;
-END $$;
 
 -- ============================================
 -- REFRESH USER POINTS
