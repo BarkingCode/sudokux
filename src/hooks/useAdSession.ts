@@ -1,45 +1,51 @@
 /**
  * Hook for managing ad session state.
- * Handles game limits, daily reset, and session persistence.
+ * Tracks separate counters for Chapters (interstitial) and Free Run (rewarded).
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { loadData, saveData } from '../utils/storage';
-import { GAMES_PER_SESSION, GAMES_PER_REWARD, CHAPTERS_INTERSTITIAL_FREQUENCY } from '../config/ads';
+import { INTERSTITIAL_MIN_GAMES, INTERSTITIAL_MAX_GAMES, FREERUN_GAMES_PER_SESSION } from '../config/ads';
 
 const STORAGE_KEY_SESSION = 'sudoku_ad_session';
 
+/**
+ * Generate random number of games until next interstitial ad (inclusive range)
+ */
+const generateNextInterstitialThreshold = (): number => {
+  return Math.floor(Math.random() * (INTERSTITIAL_MAX_GAMES - INTERSTITIAL_MIN_GAMES + 1)) + INTERSTITIAL_MIN_GAMES;
+};
+
 export interface AdSession {
-  gamesPlayedToday: number;
-  gamesRemaining: number;
-  lastResetDate: string; // ISO date string (YYYY-MM-DD)
-  puzzlesSinceLastAd: number;
+  // Chapters mode - interstitial ads
+  chapterGamesSinceLastAd: number;
+  nextInterstitialThreshold: number; // Random threshold (2-4)
+  // Free Run mode - game limit with rewarded ads
+  freeRunGamesRemaining: number;
 }
 
 export interface UseAdSessionReturn {
   session: AdSession;
-  isAtLimit: boolean;
-  consumeGame: () => boolean;
-  addGames: (count: number) => void;
-  incrementPuzzleCount: () => number;
-  resetPuzzleCount: () => void;
+  // Chapter functions
+  incrementChapterCount: () => number;
+  resetChapterCount: () => void;
   shouldShowInterstitial: () => boolean;
+  // Free Run functions
+  freeRunGamesRemaining: number;
+  isAtFreeRunLimit: boolean;
+  consumeFreeRunGame: () => boolean;
+  addFreeRunGames: () => void;
 }
 
-const getTodayDateString = (): string => {
-  return new Date().toISOString().split('T')[0];
-};
-
 const createInitialSession = (): AdSession => ({
-  gamesPlayedToday: 0,
-  gamesRemaining: GAMES_PER_SESSION,
-  lastResetDate: getTodayDateString(),
-  puzzlesSinceLastAd: 0,
+  chapterGamesSinceLastAd: 0,
+  nextInterstitialThreshold: generateNextInterstitialThreshold(),
+  freeRunGamesRemaining: FREERUN_GAMES_PER_SESSION,
 });
 
 /**
  * Manages ad session state with persistence.
- * Handles daily reset and game limits.
+ * Tracks puzzles completed for both Chapters and Free Run modes.
  */
 export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
   const [session, setSession] = useState<AdSession>(createInitialSession());
@@ -47,16 +53,8 @@ export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
   // Load session on mount
   useEffect(() => {
     loadData<AdSession>(STORAGE_KEY_SESSION).then((saved) => {
-      if (saved) {
-        // Check if we need to reset for a new day
-        const today = getTodayDateString();
-        if (saved.lastResetDate !== today) {
-          const newSession = createInitialSession();
-          setSession(newSession);
-          saveData(STORAGE_KEY_SESSION, newSession);
-        } else {
-          setSession(saved);
-        }
+      if (saved && typeof saved.nextInterstitialThreshold === 'number') {
+        setSession(saved);
       }
     });
   }, []);
@@ -66,73 +64,70 @@ export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
     saveData(STORAGE_KEY_SESSION, session);
   }, [session]);
 
-  // Consume a game (returns true if allowed to play)
-  const consumeGame = useCallback((): boolean => {
-    if (isAdFree) return true;
+  // ============================================
+  // CHAPTERS - Interstitial Ads
+  // ============================================
 
-    // Check for daily reset
-    const today = getTodayDateString();
-    if (session.lastResetDate !== today) {
-      const newSession = createInitialSession();
-      newSession.gamesRemaining = GAMES_PER_SESSION - 1;
-      setSession(newSession);
-      return true;
-    }
+  const incrementChapterCount = useCallback((): number => {
+    let newCount = 0;
+    setSession((prev) => {
+      newCount = prev.chapterGamesSinceLastAd + 1;
+      return {
+        ...prev,
+        chapterGamesSinceLastAd: newCount,
+      };
+    });
+    return session.chapterGamesSinceLastAd + 1;
+  }, [session.chapterGamesSinceLastAd]);
 
-    if (session.gamesRemaining <= 0) {
+  const resetChapterCount = useCallback(() => {
+    setSession((prev) => ({
+      ...prev,
+      chapterGamesSinceLastAd: 0,
+      nextInterstitialThreshold: generateNextInterstitialThreshold(),
+    }));
+  }, []);
+
+  const shouldShowInterstitial = useCallback((): boolean => {
+    return session.chapterGamesSinceLastAd + 1 >= session.nextInterstitialThreshold;
+  }, [session.chapterGamesSinceLastAd, session.nextInterstitialThreshold]);
+
+  // ============================================
+  // FREE RUN - Game Limit with Rewarded Ads
+  // ============================================
+
+  const isAtFreeRunLimit = session.freeRunGamesRemaining <= 0;
+
+  // Consume a Free Run game (returns true if allowed to play)
+  const consumeFreeRunGame = useCallback((): boolean => {
+    if (session.freeRunGamesRemaining <= 0) {
       return false;
     }
 
     setSession((prev) => ({
       ...prev,
-      gamesPlayedToday: prev.gamesPlayedToday + 1,
-      gamesRemaining: prev.gamesRemaining - 1,
+      freeRunGamesRemaining: prev.freeRunGamesRemaining - 1,
     }));
 
     return true;
-  }, [session, isAdFree]);
+  }, [session.freeRunGamesRemaining]);
 
-  // Add games (after watching rewarded ad)
-  const addGames = useCallback((count: number = GAMES_PER_REWARD) => {
+  // Add games after watching rewarded ad
+  const addFreeRunGames = useCallback(() => {
     setSession((prev) => ({
       ...prev,
-      gamesRemaining: prev.gamesRemaining + count,
+      freeRunGamesRemaining: prev.freeRunGamesRemaining + FREERUN_GAMES_PER_SESSION,
     }));
   }, []);
-
-  // Increment puzzle count and return new value
-  const incrementPuzzleCount = useCallback((): number => {
-    let newCount = 0;
-    setSession((prev) => {
-      newCount = prev.puzzlesSinceLastAd + 1;
-      return {
-        ...prev,
-        puzzlesSinceLastAd: newCount,
-      };
-    });
-    return session.puzzlesSinceLastAd + 1;
-  }, [session.puzzlesSinceLastAd]);
-
-  // Reset puzzle count (after showing ad)
-  const resetPuzzleCount = useCallback(() => {
-    setSession((prev) => ({
-      ...prev,
-      puzzlesSinceLastAd: 0,
-    }));
-  }, []);
-
-  // Check if interstitial should be shown
-  const shouldShowInterstitial = useCallback((): boolean => {
-    return session.puzzlesSinceLastAd + 1 >= CHAPTERS_INTERSTITIAL_FREQUENCY;
-  }, [session.puzzlesSinceLastAd]);
 
   return {
     session,
-    isAtLimit: !isAdFree && session.gamesRemaining <= 0,
-    consumeGame,
-    addGames,
-    incrementPuzzleCount,
-    resetPuzzleCount,
+    incrementChapterCount,
+    resetChapterCount,
     shouldShowInterstitial,
+    freeRunGamesRemaining: session.freeRunGamesRemaining,
+    isAtFreeRunLimit,
+    consumeFreeRunGame,
+    addFreeRunGames,
   };
 };

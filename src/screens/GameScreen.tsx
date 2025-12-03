@@ -64,7 +64,7 @@ export default function GameScreen() {
     clearChapterProgress,
     incrementMistakes,
   } = useGame();
-  const { onPuzzleComplete, isAdFree } = useAds();
+  const { onChapterComplete: showChapterAd, isAdFree } = useAds();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const modals = useGameModals();
@@ -314,7 +314,7 @@ export default function GameScreen() {
     setChapterGamesCount(newGamesCount);
 
     try {
-      await onPuzzleComplete();
+      await showChapterAd();
     } catch (err) {
       console.log('[GameScreen] Ad error:', err);
     }
@@ -335,7 +335,7 @@ export default function GameScreen() {
       puzzleNumber: nextPuzzle.toString(),
       chapterGamesCompleted: newGamesCount.toString(),
     });
-  }, [isChapter, puzzleNumber, chapterGamesCount, router, onPuzzleComplete, loadSavedPuzzle, saveChapterCompletion, clearChapterProgress, modals]);
+  }, [isChapter, puzzleNumber, chapterGamesCount, router, showChapterAd, loadSavedPuzzle, saveChapterCompletion, clearChapterProgress, modals]);
 
   // Handle back to chapters
   const handleBackToChapters = useCallback(async () => {
@@ -359,14 +359,14 @@ export default function GameScreen() {
       }
 
       try {
-        await onPuzzleComplete();
+        await showChapterAd();
       } catch (err) {
         console.log('[GameScreen] Ad error:', err);
       }
     }
     modals.closeChapterModal();
     router.back();
-  }, [isChapter, puzzleNumber, chapterGamesCount, router, saveChapterCompletion, onPuzzleComplete, clearChapterProgress, modals]);
+  }, [isChapter, puzzleNumber, chapterGamesCount, router, saveChapterCompletion, showChapterAd, clearChapterProgress, modals]);
 
   // Handle free run play again
   const handleFreeRunPlayAgain = useCallback(async () => {
@@ -375,9 +375,11 @@ export default function GameScreen() {
     await saveFreeRunCompletion();
     // Clear saved Free Run state since we're starting fresh
     await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
-    startNewGame(gameState.difficulty, gameState.gridType);
+
+    // Go back to Free Run screen (game limit is checked there before starting)
     modals.closeFreeRunModal();
-  }, [gameState, startNewGame, modals, saveFreeRunCompletion]);
+    router.back();
+  }, [gameState, modals, saveFreeRunCompletion, router]);
 
   // Handle back to free run
   const handleBackToFreeRun = useCallback(async () => {
@@ -385,6 +387,7 @@ export default function GameScreen() {
     await saveFreeRunCompletion();
     // Clear saved Free Run state since game is complete
     await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
+
     modals.closeFreeRunModal();
     router.back();
   }, [router, modals, saveFreeRunCompletion]);

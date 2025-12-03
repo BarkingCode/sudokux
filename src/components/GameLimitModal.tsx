@@ -1,22 +1,19 @@
 /**
- * Modal shown when user reaches the 5-game session limit.
+ * Modal shown when user has run out of Free Run games.
  * Prompts user to watch a rewarded ad to unlock more games.
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { View, StyleSheet, Modal, ActivityIndicator } from 'react-native';
 import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
 import { useTheme } from '../context/ThemeContext';
 import { useAds } from '../context/AdContext';
-import { GAMES_PER_REWARD } from '../config/ads';
 
 interface GameLimitModalProps {
   visible: boolean;
   onClose: () => void;
-  onUnlocked?: () => void;
+  onUnlocked: () => void;
 }
 
 export const GameLimitModal: React.FC<GameLimitModalProps> = ({
@@ -25,121 +22,93 @@ export const GameLimitModal: React.FC<GameLimitModalProps> = ({
   onUnlocked,
 }) => {
   const { colors } = useTheme();
-  const { showRewardedAd, isRewardedAdReady, isLoadingAd, gamesRemaining } = useAds();
+  const { showRewardedAd, isRewardedAdReady, isLoadingAd, freeRunGamesRemaining } = useAds();
   const [isWatching, setIsWatching] = useState(false);
 
   const handleWatchAd = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsWatching(true);
-
-    const success = await showRewardedAd();
-
-    setIsWatching(false);
-
-    if (success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onUnlocked?.();
-      onClose();
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    try {
+      const success = await showRewardedAd();
+      if (success) {
+        onUnlocked();
+      }
+    } catch (error) {
+      console.log('[GameLimitModal] Error showing ad:', error);
+    } finally {
+      setIsWatching(false);
     }
-  };
-
-  const handleClose = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onClose();
   };
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
     >
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(200)}
-        style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.8)' }]}
-      >
-        <Pressable style={styles.overlayPress} onPress={handleClose}>
-          <Animated.View
-            entering={SlideInDown.springify().damping(15)}
-            exiting={SlideOutDown.springify()}
-            style={[styles.modal, { backgroundColor: colors.background, borderColor: colors.primary }]}
-          >
-            <Pressable>
-              {/* Header */}
-              <View style={styles.header}>
-                <BrutalistText size={11} mono uppercase muted>
-                  Session Limit
-                </BrutalistText>
-                <BrutalistText size={28} bold uppercase letterSpacing={1}>
-                  OUT OF GAMES
+      <View style={styles.overlay}>
+        <View style={[styles.modal, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+          {/* Header */}
+          <View style={styles.header}>
+            <BrutalistText size={24} bold uppercase>
+              OUT OF GAMES
+            </BrutalistText>
+            <View style={[styles.headerLine, { backgroundColor: colors.primary }]} />
+          </View>
+
+          {/* Content */}
+          <View style={styles.content}>
+            <BrutalistText size={14} style={styles.description}>
+              You've used all your free games. Watch a short ad to unlock 3 more games!
+            </BrutalistText>
+
+            <View style={styles.statsRow}>
+              <BrutalistText size={12} mono muted>
+                Games Remaining
+              </BrutalistText>
+              <BrutalistText size={18} bold mono>
+                {freeRunGamesRemaining}
+              </BrutalistText>
+            </View>
+          </View>
+
+          {/* Actions */}
+          <View style={styles.actions}>
+            {isWatching || isLoadingAd ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <BrutalistText size={12} mono muted style={styles.loadingText}>
+                  Loading ad...
                 </BrutalistText>
               </View>
-
-              {/* Divider */}
-              <View style={[styles.divider, { backgroundColor: colors.primary }]} />
-
-              {/* Content */}
-              <View style={styles.content}>
-                <BrutalistText size={14} style={styles.description}>
-                  You've completed {GAMES_PER_REWARD} games today.
-                </BrutalistText>
-                <BrutalistText size={14} muted style={styles.description}>
-                  Watch a short video to unlock {GAMES_PER_REWARD} more games.
-                </BrutalistText>
-              </View>
-
-              {/* Reward info */}
-              <View style={[styles.rewardBox, { borderColor: colors.muted }]}>
-                <BrutalistText size={12} mono uppercase muted>
-                  Reward
-                </BrutalistText>
-                <BrutalistText size={24} bold>
-                  +{GAMES_PER_REWARD} GAMES
-                </BrutalistText>
-              </View>
-
-              {/* Actions */}
-              <View style={styles.actions}>
-                {isWatching || isLoadingAd ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <BrutalistText size={12} mono muted style={{ marginLeft: 12 }}>
-                      {isWatching ? 'Loading ad...' : 'Preparing...'}
-                    </BrutalistText>
-                  </View>
-                ) : (
-                  <>
-                    <BrutalistButton
-                      title="WATCH AN AD"
-                      onPress={handleWatchAd}
-                      size="large"
-                      style={styles.watchButton}
-                      disabled={!isRewardedAdReady && !__DEV__}
-                    />
-                    {!isRewardedAdReady && (
-                      <BrutalistText size={11} mono muted style={styles.hint}>
-                        Ad loading... please wait
-                      </BrutalistText>
-                    )}
-                  </>
-                )}
-
+            ) : (
+              <>
                 <BrutalistButton
-                  title="MAYBE LATER"
-                  onPress={handleClose}
-                  variant="ghost"
-                  size="small"
-                  style={styles.closeButton}
+                  title="WATCH AD"
+                  onPress={handleWatchAd}
+                  variant="primary"
+                  size="large"
+                  disabled={!isRewardedAdReady && !__DEV__}
+                  style={styles.watchButton}
                 />
-              </View>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Animated.View>
+                {!isRewardedAdReady && (
+                  <BrutalistText size={10} mono muted style={styles.hint}>
+                    Ad loading...
+                  </BrutalistText>
+                )}
+              </>
+            )}
+
+            <BrutalistButton
+              title="MAYBE LATER"
+              onPress={onClose}
+              variant="outline"
+              size="medium"
+              style={styles.closeButton}
+            />
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 };
@@ -147,12 +116,7 @@ export const GameLimitModal: React.FC<GameLimitModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overlayPress: {
-    flex: 1,
-    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -165,45 +129,47 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  divider: {
-    height: 3,
+  headerLine: {
     width: 60,
-    alignSelf: 'center',
-    marginBottom: 20,
+    height: 3,
+    marginTop: 12,
   },
   content: {
-    alignItems: 'center',
     marginBottom: 24,
   },
   description: {
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 20,
+    lineHeight: 22,
   },
-  rewardBox: {
-    borderWidth: 2,
-    padding: 16,
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(128, 128, 128, 0.3)',
   },
   actions: {
     gap: 12,
   },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+  },
   watchButton: {
     width: '100%',
   },
-  closeButton: {
-    width: '100%',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-  },
   hint: {
     textAlign: 'center',
-    marginTop: 8,
+  },
+  closeButton: {
+    width: '100%',
   },
 });

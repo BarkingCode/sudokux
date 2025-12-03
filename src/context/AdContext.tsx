@@ -1,7 +1,8 @@
 /**
  * Ad management context.
- * Handles game session limits, ad loading, and display.
- * Supports 5-game session limit with rewarded ads to unlock more games.
+ * Handles ads for different game modes:
+ * - Chapters: Interstitial ads every 2-4 games (randomized)
+ * - Free Run: Game limit (3 games) then rewarded ad to continue
  *
  * Uses extracted hooks for modularity:
  * - useAdSession: Session state and persistence
@@ -14,23 +15,22 @@ import { Platform } from 'react-native';
 import { useAdSession } from '../hooks/useAdSession';
 import { useInterstitialAd } from '../hooks/useInterstitialAd';
 import { useRewardedAd } from '../hooks/useRewardedAd';
-import { GAMES_PER_REWARD } from '../config/ads';
 
 interface AdContextType {
-  // Session state
-  gamesRemaining: number;
-  isAtLimit: boolean;
   isAdFree: boolean;
 
-  // Actions
-  consumeGame: () => boolean;
-  onPuzzleComplete: () => Promise<void>;
+  // Chapter actions
+  onChapterComplete: () => Promise<void>;
+
+  // Free Run game limit
+  freeRunGamesRemaining: number;
+  isAtFreeRunLimit: boolean;
+  consumeFreeRunGame: () => boolean;
   showRewardedAd: () => Promise<boolean>;
-  showInterstitialAd: () => Promise<void>;
 
   // Ad loading state
-  isRewardedAdReady: boolean;
   isInterstitialAdReady: boolean;
+  isRewardedAdReady: boolean;
   isLoadingAd: boolean;
 }
 
@@ -42,33 +42,32 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   // Session management
   const {
     session,
-    isAtLimit,
-    consumeGame,
-    addGames,
-    incrementPuzzleCount,
-    resetPuzzleCount,
+    incrementChapterCount,
+    resetChapterCount,
     shouldShowInterstitial,
+    freeRunGamesRemaining,
+    isAtFreeRunLimit,
+    consumeFreeRunGame,
+    addFreeRunGames,
   } = useAdSession(isAdFree);
 
-  // Interstitial ad
+  // Interstitial ad (for Chapters)
   const interstitialAd = useInterstitialAd({ isAdFree });
 
-  // Rewarded ad - grant games when reward earned
+  // Rewarded ad (for Free Run) - grant games when reward earned
   const handleRewardEarned = useCallback(() => {
-    addGames(GAMES_PER_REWARD);
-  }, [addGames]);
+    addFreeRunGames();
+  }, [addFreeRunGames]);
 
-  const rewardedAd = useRewardedAd({
-    isAdFree,
-    onRewardEarned: handleRewardEarned,
-  });
+  const rewardedAd = useRewardedAd({ isAdFree, onRewardEarned: handleRewardEarned });
 
-  // Called when puzzle is completed - may show interstitial
-  const onPuzzleComplete = useCallback(async (): Promise<void> => {
-    console.log('[AdContext] onPuzzleComplete called', {
+  // Called when Chapter puzzle is completed - may show interstitial
+  const onChapterComplete = useCallback(async (): Promise<void> => {
+    console.log('[AdContext] onChapterComplete called', {
       isAdFree,
       platform: Platform.OS,
-      puzzlesSinceLastAd: session.puzzlesSinceLastAd,
+      chapterGamesSinceLastAd: session.chapterGamesSinceLastAd,
+      nextInterstitialThreshold: session.nextInterstitialThreshold,
       isInterstitialAdReady: interstitialAd.isReady,
     });
 
@@ -78,36 +77,36 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
 
     const willShowAd = shouldShowInterstitial() && interstitialAd.isReady;
-    incrementPuzzleCount();
+    incrementChapterCount();
 
     if (willShowAd) {
       console.log('[AdContext] Showing interstitial ad');
-      resetPuzzleCount();
+      resetChapterCount();
       await interstitialAd.show();
     } else {
-      console.log('[AdContext] Not showing ad yet');
+      console.log('[AdContext] Not showing ad yet, threshold:', session.nextInterstitialThreshold);
     }
   }, [
     isAdFree,
-    session.puzzlesSinceLastAd,
+    session.chapterGamesSinceLastAd,
+    session.nextInterstitialThreshold,
     interstitialAd,
     shouldShowInterstitial,
-    incrementPuzzleCount,
-    resetPuzzleCount,
+    incrementChapterCount,
+    resetChapterCount,
   ]);
 
   return (
     <AdContext.Provider
       value={{
-        gamesRemaining: session.gamesRemaining,
-        isAtLimit,
         isAdFree,
-        consumeGame,
-        onPuzzleComplete,
+        onChapterComplete,
+        freeRunGamesRemaining: isAdFree ? 999 : freeRunGamesRemaining,
+        isAtFreeRunLimit: !isAdFree && isAtFreeRunLimit,
+        consumeFreeRunGame,
         showRewardedAd: rewardedAd.show,
-        showInterstitialAd: interstitialAd.show,
-        isRewardedAdReady: rewardedAd.isReady,
         isInterstitialAdReady: interstitialAd.isReady,
+        isRewardedAdReady: rewardedAd.isReady,
         isLoadingAd: rewardedAd.isLoading,
       }}
     >

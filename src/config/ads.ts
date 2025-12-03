@@ -4,8 +4,8 @@
  * Replace with real IDs before production release.
  *
  * Ad Strategy by Game Mode:
- * - CHAPTERS: Interstitial every 3 completed games
- * - FREE RUN: Rewarded ad to unlock 5 games per session (no interstitials)
+ * - CHAPTERS: Interstitial every 2-4 completed games (randomized)
+ * - FREE RUN: Rewarded ad every 5 completed games
  * - DAILY: No ads
  */
 
@@ -15,27 +15,20 @@ import { TestIds } from 'react-native-google-mobile-ads';
 // ============================================
 // CHAPTERS MODE - Interstitial Ads
 // ============================================
-// Show interstitial after every N completed chapter puzzles
-export const CHAPTERS_INTERSTITIAL_FREQUENCY = 3;
+// Show interstitial after random number of completed puzzles (inclusive range)
+export const INTERSTITIAL_MIN_GAMES = 2;
+export const INTERSTITIAL_MAX_GAMES = 4;
 
 // ============================================
-// FREE RUN MODE - Session Limits (Rewarded Ads)
+// FREE RUN MODE - Rewarded Ads
 // ============================================
-// Games allowed per session before needing to watch rewarded ad
-export const FREERUN_GAMES_PER_SESSION = 5;
-// Games unlocked by watching a rewarded ad
-export const FREERUN_GAMES_PER_REWARD = 5;
+// Show "out of games" modal after N games, requiring rewarded ad to continue
+export const FREERUN_GAMES_PER_SESSION = 3;
 
 // ============================================
 // DAILY MODE - No Ads
 // ============================================
 // Daily challenges have no ads, competition-based
-
-// ============================================
-// Legacy exports (for backward compatibility)
-// ============================================
-export const GAMES_PER_SESSION = FREERUN_GAMES_PER_SESSION;
-export const GAMES_PER_REWARD = FREERUN_GAMES_PER_REWARD;
 
 // Production Ad Unit IDs from environment variables
 const PRODUCTION_AD_UNIT_IDS = {
