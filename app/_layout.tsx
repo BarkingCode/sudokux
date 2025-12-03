@@ -33,6 +33,9 @@ function NotificationHandler() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
+    // Clear badge immediately on app open (no number badge on icon)
+    Notifications.setBadgeCountAsync(0);
+
     // Initialize services with user ID
     const initServices = async () => {
       try {

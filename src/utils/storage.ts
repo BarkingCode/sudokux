@@ -10,8 +10,10 @@ export const STORAGE_KEYS = {
   DAILY_GAME_STATE: 'sudoku_daily_game_state', // Daily challenge game state
   SETTINGS: 'sudoku_settings',
   STATS: 'sudoku_stats',
-  CHAPTER_PROGRESS: 'sudoku_chapter_progress',
+  CHAPTER_PROGRESS: 'sudoku_chapter_progress', // 9x9 chapter progress
+  CHAPTER_PROGRESS_6X6: 'sudoku_chapter_progress_6x6', // 6x6 chapter progress
   CHAPTER_IN_PROGRESS: 'sudoku_chapter_in_progress', // Single active chapter game progress
+  CHAPTER_GRID_TYPE: 'sudoku_chapter_grid_type', // Selected grid type for chapters
 };
 
 /**

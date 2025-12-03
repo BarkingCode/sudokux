@@ -344,9 +344,16 @@ export default function ProfileScreen() {
                       ]}
                     >
                       <View style={styles.recentGameInfo}>
-                        <BrutalistText size={14} bold>
-                          {DIFFICULTY_LABELS[game.difficulty] || game.difficulty}
-                        </BrutalistText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <BrutalistText size={14} bold>
+                            {DIFFICULTY_LABELS[game.difficulty] || game.difficulty}
+                          </BrutalistText>
+                          <View style={[styles.gridTypeBadge, { borderColor: colors.muted }]}>
+                            <BrutalistText size={9} mono muted>
+                              {game.grid_type || '9x9'}
+                            </BrutalistText>
+                          </View>
+                        </View>
                         <BrutalistText size={10} mono muted>
                           {formatDate(game.completed_at)}
                         </BrutalistText>
@@ -472,5 +479,10 @@ const styles = StyleSheet.create({
   completedBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  gridTypeBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
 });

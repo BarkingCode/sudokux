@@ -313,34 +313,48 @@ export const submitDailyCompletion = async (
 
 /**
  * Update user's daily streak after completing a challenge
+ *
+ * Streak logic:
+ * - If last_daily_completed is yesterday (local time): increment streak
+ * - If last_daily_completed is today (already completed): keep current streak
+ * - Otherwise (first completion or missed day): reset to 1
  */
 const updateDailyStreak = async (userId: string): Promise<void> => {
   const today = getLocalDateString();
   const yesterdayStr = getYesterdayLocalDateString();
 
   try {
-    // Get current stats
-    const { data: stats } = await supabase
+    // Get current stats (use maybeSingle to handle no row case)
+    const { data: stats, error: selectError } = await supabase
       .from('user_stats')
       .select('daily_streak, best_daily_streak, last_daily_completed')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
+    if (selectError) {
+      console.error('Error fetching user stats for streak:', selectError);
+    }
+
+    const lastCompleted = stats?.last_daily_completed;
+    const currentStreak = stats?.daily_streak || 0;
     let newStreak = 1;
     let bestStreak = stats?.best_daily_streak || 0;
 
-    if (stats?.last_daily_completed === yesterdayStr) {
+    if (lastCompleted === today) {
+      // Already completed today - keep existing streak (don't reset)
+      newStreak = currentStreak;
+    } else if (lastCompleted === yesterdayStr) {
       // Consecutive day - increment streak
-      newStreak = (stats.daily_streak || 0) + 1;
+      newStreak = currentStreak + 1;
     }
-    // else: streak resets to 1
+    // else: first completion or missed day - streak resets to 1
 
     if (newStreak > bestStreak) {
       bestStreak = newStreak;
     }
 
-    // Update stats
-    await supabase
+    // Update stats (upsert handles both insert and update)
+    const { error: upsertError } = await supabase
       .from('user_stats')
       .upsert({
         user_id: userId,
@@ -350,6 +364,10 @@ const updateDailyStreak = async (userId: string): Promise<void> => {
       }, {
         onConflict: 'user_id',
       });
+
+    if (upsertError) {
+      console.error('Error upserting daily streak:', upsertError);
+    }
   } catch (error) {
     console.error('Error updating daily streak:', error);
   }
