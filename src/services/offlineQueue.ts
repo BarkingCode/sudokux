@@ -19,7 +19,7 @@ interface QueuedGameResult {
   difficulty: string;
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   completed: boolean;
   timestamp: string;
 }

@@ -17,7 +17,7 @@ export interface GameResult {
   difficulty: Difficulty;
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   completed: boolean;
   gridType?: GridType;
 }
@@ -36,7 +36,7 @@ export async function recordGameSession(
       difficulty: result.difficulty,
       time_seconds: result.timeSeconds,
       mistakes: result.mistakes,
-      hints_used: result.hintsUsed,
+      helper_used: result.helperUsed,
       completed: result.completed,
       grid_type: result.gridType || '9x9',
     };
@@ -77,13 +77,13 @@ export async function getGameHistory(
         .limit(limit),
       supabase
         .from('chapter_completions' as any)
-        .select('id, user_id, difficulty, time_seconds, mistakes, hints_used, completed_at, created_at, puzzle_number')
+        .select('id, user_id, difficulty, time_seconds, mistakes, helper_used, completed_at, created_at, puzzle_number')
         .eq('user_id', userId)
         .order('completed_at', { ascending: false })
         .limit(limit),
       supabase
         .from('daily_completions')
-        .select('id, user_id, time_seconds, mistakes, hints_used, completed_at, challenge_id')
+        .select('id, user_id, time_seconds, mistakes, helper_used, completed_at, challenge_id')
         .eq('user_id', userId)
         .order('completed_at', { ascending: false })
         .limit(limit),
@@ -104,7 +104,7 @@ export async function getGameHistory(
         difficulty: string;
         time_seconds: number;
         mistakes: number;
-        hints_used: number;
+        helper_used: number;
         completed_at: string;
         created_at: string;
         puzzle_number: number;
@@ -116,7 +116,7 @@ export async function getGameHistory(
           difficulty: ch.difficulty,
           time_seconds: ch.time_seconds,
           mistakes: ch.mistakes,
-          hints_used: ch.hints_used,
+          helper_used: ch.helper_used,
           completed: true,
           completed_at: ch.completed_at,
           created_at: ch.created_at,
@@ -148,7 +148,7 @@ export async function getGameHistory(
           difficulty: difficultyMap.get(dc.challenge_id) || 'medium',
           time_seconds: dc.time_seconds,
           mistakes: dc.mistakes,
-          hints_used: dc.hints_used,
+          helper_used: dc.helper_used,
           completed: true,
           completed_at: dc.completed_at,
           created_at: dc.completed_at,

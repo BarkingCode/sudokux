@@ -58,7 +58,7 @@ const calculateGamePoints = (game: GameSession): number => {
     (game.grid_type || '9x9') as GridType
   );
   const mistakePenalty = (game.mistakes || 0) * Math.abs(info.mistakePenalty);
-  const helperPenalty = (game.hints_used || 0) * Math.abs(info.helperPenalty);
+  const helperPenalty = (game.helper_used || 0) * Math.abs(info.helperPenalty);
   return Math.max(0, info.gamePoints - mistakePenalty - helperPenalty);
 };
 

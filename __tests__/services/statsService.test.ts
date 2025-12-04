@@ -71,7 +71,7 @@ describe('statsService', () => {
       difficulty: 'medium',
       timeSeconds: 300,
       mistakes: 2,
-      hintsUsed: 1,
+      helperUsed: 1,
       completed: true,
     };
 

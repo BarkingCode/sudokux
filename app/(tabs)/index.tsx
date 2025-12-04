@@ -403,7 +403,7 @@ export default function ChaptersScreen() {
           grid: inProgressData.currentGrid,
           timer: inProgressData.timer,
           mistakes: inProgressData.mistakes,
-          hintsUsed: inProgressData.hintsUsed,
+          helperUsed: inProgressData.helperUsed,
           notes: inProgressData.notes,
           history: inProgressData.history || [],
         });

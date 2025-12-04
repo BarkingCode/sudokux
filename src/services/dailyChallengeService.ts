@@ -35,7 +35,7 @@ export interface DailyCompletion {
   challenge_date: string;
   time_seconds: number;
   mistakes: number;
-  hints_used: number;
+  helper_used: number;
   completed_at: string;
 }
 
@@ -266,7 +266,7 @@ export const submitDailyCompletion = async (
   challenge: DailyChallenge,
   timeSeconds: number,
   mistakes: number,
-  hintsUsed: number
+  helperUsed: number
 ): Promise<{ success: boolean; error?: string }> => {
   const today = getTodayDateUTC();
 
@@ -292,7 +292,7 @@ export const submitDailyCompletion = async (
         challenge_date: today,
         time_seconds: timeSeconds,
         mistakes,
-        hints_used: hintsUsed,
+        helper_used: helperUsed,
       });
 
     if (error) {

@@ -190,7 +190,7 @@ describe('dailyChallengeService', () => {
         challenge_id: 'challenge-id',
         time_seconds: 300,
         mistakes: 2,
-        hints_used: 1,
+        helper_used: 1,
       };
 
       mockSingle.mockResolvedValue({ data: mockCompletion, error: null });

@@ -16,7 +16,7 @@ export interface GameResultForAchievements {
   difficulty: Difficulty;
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   gridType?: GridType;
 }
 
@@ -172,7 +172,7 @@ export async function checkAchievements(
     // Perfectionist - No mistakes
     { id: 'perfectionist', condition: result.mistakes === 0 },
     // No hints
-    { id: 'no_hints', condition: result.hintsUsed === 0 },
+    { id: 'no_hints', condition: result.helperUsed === 0 },
 
     // ==========================================
     // STREAK ACHIEVEMENTS

@@ -72,7 +72,7 @@ export type Database = {
           challenge_date: string;
           challenge_id: string;
           completed_at: string;
-          hints_used: number | null;
+          helper_used: number | null;
           id: string;
           mistakes: number | null;
           time_seconds: number;
@@ -82,7 +82,7 @@ export type Database = {
           challenge_date: string;
           challenge_id: string;
           completed_at?: string;
-          hints_used?: number | null;
+          helper_used?: number | null;
           id?: string;
           mistakes?: number | null;
           time_seconds: number;
@@ -92,7 +92,7 @@ export type Database = {
           challenge_date?: string;
           challenge_id?: string;
           completed_at?: string;
-          hints_used?: number | null;
+          helper_used?: number | null;
           id?: string;
           mistakes?: number | null;
           time_seconds?: number;
@@ -107,7 +107,7 @@ export type Database = {
           created_at: string;
           difficulty: string;
           grid_type: string;
-          hints_used: number | null;
+          helper_used: number | null;
           id: string;
           mistakes: number | null;
           puzzle_id: string;
@@ -120,7 +120,7 @@ export type Database = {
           created_at?: string;
           difficulty: string;
           grid_type?: string;
-          hints_used?: number | null;
+          helper_used?: number | null;
           id?: string;
           mistakes?: number | null;
           puzzle_id: string;
@@ -133,7 +133,7 @@ export type Database = {
           created_at?: string;
           difficulty?: string;
           grid_type?: string;
-          hints_used?: number | null;
+          helper_used?: number | null;
           id?: string;
           mistakes?: number | null;
           puzzle_id?: string;
@@ -468,11 +468,12 @@ export interface ChapterCompletion {
   user_id: string;
   puzzle_number: number;
   difficulty: string;
+  grid_type: string;
   puzzle_grid: string; // JSON string of 2D array
   solution_grid: string; // JSON string of 2D array
   time_seconds: number;
   mistakes: number;
-  hints_used: number;
+  helper_used: number;
   completed_at: string;
   created_at: string;
 }
@@ -481,9 +482,10 @@ export interface ChapterCompletionInsert {
   user_id: string;
   puzzle_number: number;
   difficulty: string;
+  grid_type: string;
   puzzle_grid: string;
   solution_grid: string;
   time_seconds: number;
   mistakes?: number;
-  hints_used?: number;
+  helper_used?: number;
 }

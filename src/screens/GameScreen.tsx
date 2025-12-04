@@ -237,7 +237,7 @@ export default function GameScreen() {
         solutionGrid: gameState.solution,
         timeSeconds: gameState.timer || 0,
         mistakes: gameState.mistakes,
-        hintsUsed: gameState.hintsUsed || 0,
+        helperUsed: gameState.helperUsed || 0,
       });
 
       // Check and unlock achievements after chapter completion
@@ -246,7 +246,7 @@ export default function GameScreen() {
           difficulty: gameState.difficulty,
           timeSeconds: gameState.timer || 0,
           mistakes: gameState.mistakes,
-          hintsUsed: gameState.hintsUsed || 0,
+          helperUsed: gameState.helperUsed || 0,
         });
         // Also unlock the chapter_complete achievement
         await onChapterComplete(supabaseUserId);
@@ -267,8 +267,9 @@ export default function GameScreen() {
         difficulty: gameState.difficulty,
         timeSeconds: gameState.timer || 0,
         mistakes: gameState.mistakes,
-        hintsUsed: gameState.hintsUsed || 0,
+        helperUsed: gameState.helperUsed || 0,
         completed: true,
+        gridType: gameState.gridType,
       });
 
       // Check and unlock achievements after free run completion
@@ -276,7 +277,7 @@ export default function GameScreen() {
         difficulty: gameState.difficulty,
         timeSeconds: gameState.timer || 0,
         mistakes: gameState.mistakes,
-        hintsUsed: gameState.hintsUsed || 0,
+        helperUsed: gameState.helperUsed || 0,
       });
       console.log('[GameScreen] Saved free run completion and checked achievements');
     } catch (error) {
@@ -539,7 +540,7 @@ export default function GameScreen() {
           difficulty: gameState.difficulty,
           timeSeconds: gameState.timer || 0,
           mistakes: gameState.mistakes,
-          hintsUsed: gameState.hintsUsed || 0,
+          helperUsed: gameState.helperUsed || 0,
         }}
         chapterProps={{
           puzzleNumber,

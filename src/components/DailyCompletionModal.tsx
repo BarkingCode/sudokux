@@ -30,7 +30,7 @@ interface DailyCompletionModalProps {
   difficulty: Difficulty;
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
 }
 
 const formatTime = (seconds: number): string => {
@@ -57,7 +57,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
   difficulty,
   timeSeconds,
   mistakes,
-  hintsUsed,
+  helperUsed,
 }) => {
   const { colors } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,7 +100,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     try {
       // Step 1: Submit the completion (with 10s timeout)
       const result = await withTimeout(
-        submitDailyCompletion(userId, challenge, timeSeconds, mistakes, hintsUsed),
+        submitDailyCompletion(userId, challenge, timeSeconds, mistakes, helperUsed),
         10000
       );
 
@@ -119,7 +119,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
             difficulty,
             timeSeconds,
             mistakes,
-            hintsUsed,
+            helperUsed,
           });
           console.log('[DailyCompletionModal] Checked achievements');
         } catch (e) {
@@ -164,7 +164,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [userId, challenge, difficulty, timeSeconds, mistakes, hintsUsed]);
+  }, [userId, challenge, difficulty, timeSeconds, mistakes, helperUsed]);
 
   const handleRetry = useCallback(() => {
     setHasSubmitted(false);

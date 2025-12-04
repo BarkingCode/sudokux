@@ -18,7 +18,7 @@ interface DailyModalProps {
   difficulty: Difficulty;
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
 }
 
 interface ChapterModalProps {
@@ -102,7 +102,7 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
           difficulty={dailyProps.difficulty}
           timeSeconds={dailyProps.timeSeconds}
           mistakes={dailyProps.mistakes}
-          hintsUsed={dailyProps.hintsUsed}
+          helperUsed={dailyProps.helperUsed}
         />
       )}
 

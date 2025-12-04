@@ -21,7 +21,7 @@ export interface ChapterPuzzleData {
   solutionGrid: number[][];
   timeSeconds: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface ChapterInProgress {
   solution: number[][];
   timer: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   notes: Record<string, number[]>;
   savedAt: string;
   history?: string[]; // Undo history (optional for backwards compatibility)
@@ -91,7 +91,7 @@ class ChapterService {
         solution_grid: JSON.stringify(puzzleData.solutionGrid),
         time_seconds: puzzleData.timeSeconds,
         mistakes: puzzleData.mistakes,
-        hints_used: puzzleData.hintsUsed,
+        helper_used: puzzleData.helperUsed,
       };
 
       // Upsert - update if exists, insert if not

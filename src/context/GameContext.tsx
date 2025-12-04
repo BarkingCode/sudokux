@@ -23,7 +23,7 @@ export interface GameState {
   initialGrid: number[][];
   solution: number[][];
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   timer: number;
   isComplete: boolean;
   isLoading: boolean;
@@ -57,7 +57,7 @@ export interface SavedPuzzleWithProgress extends SavedPuzzleData {
   grid: number[][];
   timer: number;
   mistakes: number;
-  hintsUsed: number;
+  helperUsed: number;
   notes: Record<string, number[]>;
   history?: string[]; // Undo history (optional for backwards compatibility)
 }
@@ -101,7 +101,7 @@ const createInitialState = (gridType: GridType = '9x9'): GameState => ({
   initialGrid: createEmptyGridForType(gridType),
   solution: createEmptyGridForType(gridType),
   mistakes: 0,
-  hintsUsed: 0,
+  helperUsed: 0,
   timer: 0,
   isComplete: false,
   isLoading: false,
@@ -251,7 +251,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Load a saved puzzle with existing progress (for resuming mid-game)
    */
   const loadSavedPuzzleWithProgress = useCallback((data: SavedPuzzleWithProgress) => {
-    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, hintsUsed, notes, history } = data;
+    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, helperUsed, notes, history } = data;
 
     const newState: GameState = {
       ...createInitialState(gridType),
@@ -263,7 +263,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       puzzleId,
       timer,
       mistakes,
-      hintsUsed,
+      helperUsed,
       notes: { ...notes },
       history: history || [], // Restore undo history
       isLoading: false,
@@ -290,7 +290,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       solution: currentState.solution,
       timer: currentState.timer,
       mistakes: currentState.mistakes,
-      hintsUsed: currentState.hintsUsed,
+      helperUsed: currentState.helperUsed,
       notes: currentState.notes,
       savedAt: new Date().toISOString(),
       history: currentState.history,
@@ -418,9 +418,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Unlock the Smart Possibility Helper for the current game.
    * Called after user watches a rewarded ad.
+   * Increments helperUsed by 1 for point penalty calculation.
    */
   const unlockHelper = useCallback(() => {
-    setGameState(prev => prev ? ({ ...prev, isHelperUnlocked: true }) : null);
+    setGameState(prev => prev ? ({
+      ...prev,
+      isHelperUnlocked: true,
+      helperUsed: prev.helperUsed + 1,
+    }) : null);
   }, []);
 
   // DEV ONLY: Auto-complete the puzzle with the solution

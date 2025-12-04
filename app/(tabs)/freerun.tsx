@@ -103,7 +103,7 @@ export default function FreeRunScreen() {
       grid: savedGame.grid,
       timer: savedGame.timer,
       mistakes: savedGame.mistakes,
-      hintsUsed: savedGame.hintsUsed,
+      helperUsed: savedGame.helperUsed,
       notes: savedGame.notes,
       history: savedGame.history || [],
     });

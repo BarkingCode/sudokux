@@ -145,7 +145,7 @@ describe('GameContext', () => {
         await Promise.resolve();
       });
 
-      expect(result.current.gameState?.hintsUsed).toBe(0);
+      expect(result.current.gameState?.helperUsed).toBe(0);
     });
 
     it('should initialize with zero timer', async () => {

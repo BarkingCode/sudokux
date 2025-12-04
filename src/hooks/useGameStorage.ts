@@ -24,7 +24,7 @@ export const useGameStorage = ({ onLoadComplete }: UseGameStorageOptions) => {
         if (!savedState.gridType) savedState.gridType = '9x9';
         if (savedState.isLoading === undefined) savedState.isLoading = false;
         if (!savedState.conflictCells) savedState.conflictCells = [];
-        if (savedState.hintsUsed === undefined) savedState.hintsUsed = 0;
+        if (savedState.helperUsed === undefined) savedState.helperUsed = 0;
         // Always start paused - GameScreen will resume when focused
         savedState.isPaused = true;
       }
