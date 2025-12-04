@@ -49,12 +49,27 @@ Each game mode has a distinct ad strategy to provide the best user experience:
 
 Rewards:
 - +5 games (Free Run session unlock)
-- +1 hint
+- Smart Possibility Helper unlock (per-game)
 - XP boost
 - Retry option
 - Chapter finale bonus (optional)
 
 Rewards must trigger only after full ad completion.
+
+### Smart Possibility Helper (Per-Game Unlock)
+
+**Flow:**
+1. User taps HELPER button in game toolbar
+2. Helper unlock modal appears with explanation
+3. User watches rewarded ad
+4. Helper becomes active for current puzzle only
+5. On next puzzle, helper resets to locked state
+
+**Details:**
+- Locked by default for every new puzzle
+- One ad unlocks for one game session
+- Shows "AD" badge on button when locked
+- Modal explains feature before showing ad
 
 ## Banner Ads
 

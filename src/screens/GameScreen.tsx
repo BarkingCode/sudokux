@@ -58,8 +58,7 @@ export default function GameScreen() {
     resetBoard,
     pauseGame,
     resumeGame,
-    getSmartHint,
-    applyHint,
+    unlockHelper,
     devAutoComplete,
     saveChapterProgress,
     clearChapterProgress,
@@ -102,6 +101,7 @@ export default function GameScreen() {
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [notesMode, setNotesMode] = useState(false);
   const [chapterGamesCount, setChapterGamesCount] = useState(initialChapterGamesCompleted);
+  const [showHelperAdModal, setShowHelperAdModal] = useState(false);
 
   // Ref to access current gameState in cleanup without causing re-renders
   const gameStateRef = useRef(gameState);
@@ -210,23 +210,19 @@ export default function GameScreen() {
     setNotesMode((prev) => !prev);
   }, []);
 
-  // Hint handler
-  const handleHint = useCallback(() => {
-    const hint = getSmartHint();
-    if (hint) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      modals.openHintModal(hint);
-      setSelectedCell({ row: hint.cell.row, col: hint.cell.col });
-    }
-  }, [getSmartHint, modals]);
+  // Toggle helper handler - shows ad modal if not unlocked
+  const handleToggleHelper = useCallback(() => {
+    if (!gameState) return;
+    if (gameState.isHelperUnlocked) return; // Already unlocked
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowHelperAdModal(true);
+  }, [gameState?.isHelperUnlocked]);
 
-  // Apply hint handler
-  const handleApplyHint = useCallback(() => {
-    if (modals.currentHint) {
-      applyHint(modals.currentHint);
-      setSelectedCell({ row: modals.currentHint.cell.row, col: modals.currentHint.cell.col });
-    }
-  }, [modals.currentHint, applyHint]);
+  // Handle helper unlock after watching ad
+  const handleHelperUnlocked = useCallback(() => {
+    setShowHelperAdModal(false);
+    unlockHelper();
+  }, [unlockHelper]);
 
   // Save chapter completion to Supabase
   const saveChapterCompletion = useCallback(async () => {
@@ -508,7 +504,7 @@ export default function GameScreen() {
             onReset={handleReset}
             onUndo={undo}
             onToggleNotes={toggleNotesMode}
-            onHint={handleHint}
+            onToggleHelper={handleToggleHelper}
           />
         )}
       </View>
@@ -521,16 +517,15 @@ export default function GameScreen() {
         showDailyModal={modals.showDailyModal}
         showChapterModal={modals.showChapterModal}
         showFreeRunModal={modals.showFreeRunModal}
-        showHintModal={modals.showHintModal}
+        showHelperAdModal={showHelperAdModal}
         showPointSystemModal={modals.showPointSystemModal}
         onCloseDailyModal={handleDailyModalClose}
         onCloseChapterModal={handleBackToChapters}
         onCloseFreeRunModal={handleBackToFreeRun}
-        onCloseHintModal={modals.closeHintModal}
+        onCloseHelperAdModal={() => setShowHelperAdModal(false)}
         onClosePointSystemModal={modals.closePointSystemModal}
+        onHelperUnlocked={handleHelperUnlocked}
         gridType={gameState.gridType}
-        currentHint={modals.currentHint}
-        onApplyHint={handleApplyHint}
         dailyProps={{
           challenge: {
             id: challengeId,

@@ -10,7 +10,9 @@ import * as Haptics from 'expo-haptics';
 import { SudokuBoard } from '../board/SudokuBoard';
 import { NumberPad } from '../NumberPad';
 import { BrutalistButton } from '../BrutalistButton';
+import { AdBadge } from '../AdBadge';
 import { GRID_CONFIGS, GridConfig } from '../../game/types';
+import { isValidMove } from '../../game/engine';
 import type { GameState } from '../../context/GameContext';
 
 const { width, height } = Dimensions.get('window');
@@ -26,7 +28,7 @@ interface GamePlayAreaProps {
   onReset: () => void;
   onUndo: () => void;
   onToggleNotes: () => void;
-  onHint: () => void;
+  onToggleHelper: () => void;
 }
 
 /**
@@ -56,6 +58,37 @@ const useRemainingCounts = (
   }, [grid, isLoading, gridConfig]);
 };
 
+/**
+ * Calculates valid numbers for the selected cell when helper is active.
+ */
+const useValidNumbers = (
+  grid: number[][] | undefined,
+  initialGrid: number[][] | undefined,
+  selectedCell: { row: number; col: number } | null,
+  isHelperActive: boolean,
+  gridConfig: GridConfig
+): Set<number> | undefined => {
+  return useMemo(() => {
+    if (!grid || !initialGrid || !selectedCell || !isHelperActive) return undefined;
+
+    const { row, col } = selectedCell;
+
+    // Don't show hints for initial cells (given clues)
+    if (initialGrid[row][col] !== 0) return undefined;
+
+    // Don't show hints for already filled cells
+    if (grid[row][col] !== 0) return undefined;
+
+    const validSet = new Set<number>();
+    for (let num = 1; num <= gridConfig.maxNumber; num++) {
+      if (isValidMove(grid, row, col, num, gridConfig)) {
+        validSet.add(num);
+      }
+    }
+    return validSet;
+  }, [grid, initialGrid, selectedCell, isHelperActive, gridConfig]);
+};
+
 export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
   gameState,
   selectedCell,
@@ -65,7 +98,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
   onReset,
   onUndo,
   onToggleNotes,
-  onHint,
+  onToggleHelper,
 }) => {
   const gridConfig = useMemo(() => {
     return GRID_CONFIGS[gameState.gridType];
@@ -74,6 +107,14 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
   const remainingCounts = useRemainingCounts(
     gameState.grid,
     gameState.isLoading,
+    gridConfig
+  );
+
+  const validNumbers = useValidNumbers(
+    gameState.grid,
+    gameState.initialGrid,
+    selectedCell,
+    gameState.isHelperUnlocked,
     gridConfig
   );
 
@@ -98,6 +139,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
           onNumberPress={onNumberPress}
           remainingCounts={remainingCounts}
           maxNumber={gridConfig.maxNumber}
+          validNumbers={validNumbers}
         />
       </Animated.View>
 
@@ -124,13 +166,16 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
           size="small"
           style={styles.toolBtn}
         />
-        <BrutalistButton
-          title="HINT"
-          onPress={onHint}
-          variant="ghost"
-          size="small"
-          style={styles.toolBtn}
-        />
+        <View style={styles.helperBtnContainer}>
+          {!gameState.isHelperUnlocked && <AdBadge />}
+          <BrutalistButton
+            title="HELPER"
+            onPress={onToggleHelper}
+            variant={gameState.isHelperUnlocked ? 'primary' : 'ghost'}
+            size="small"
+            style={styles.toolBtn}
+          />
+        </View>
       </Animated.View>
     </>
   );
@@ -163,5 +208,8 @@ const styles = StyleSheet.create({
   },
   toolBtn: {
     minWidth: 70,
+  },
+  helperBtnContainer: {
+    position: 'relative',
   },
 });

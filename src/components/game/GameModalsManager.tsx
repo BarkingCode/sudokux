@@ -1,15 +1,14 @@
 /**
  * Manages and renders all game-related modals.
- * Centralizes modal rendering for Daily, Chapter, FreeRun completion and hints.
+ * Centralizes modal rendering for Daily, Chapter, FreeRun completion and helper unlock.
  */
 
 import React from 'react';
 import { DailyCompletionModal } from '../DailyCompletionModal';
 import { ChapterCompletionModal } from '../ChapterCompletionModal';
 import { FreeRunCompletionModal } from '../FreeRunCompletionModal';
-import { SmartHintModal } from '../SmartHintModal';
+import { HelperAdModal } from '../HelperAdModal';
 import { PointSystemModal } from '../PointSystemModal';
-import type { SmartHint } from '../../game/hintAnalyzer';
 import type { Difficulty, GridType } from '../../context/GameContext';
 import type { DailyChallenge } from '../../services/dailyChallengeService';
 
@@ -49,22 +48,21 @@ interface GameModalsManagerProps {
   showDailyModal: boolean;
   showChapterModal: boolean;
   showFreeRunModal: boolean;
-  showHintModal: boolean;
+  showHelperAdModal: boolean;
   showPointSystemModal: boolean;
 
   // Modal close handlers
   onCloseDailyModal: () => void;
   onCloseChapterModal: () => void;
   onCloseFreeRunModal: () => void;
-  onCloseHintModal: () => void;
+  onCloseHelperAdModal: () => void;
   onClosePointSystemModal: () => void;
+
+  // Helper unlock callback
+  onHelperUnlocked: () => void;
 
   // Current grid type for point system modal
   gridType: GridType;
-
-  // Hint
-  currentHint: SmartHint | null;
-  onApplyHint: () => void;
 
   // Modal-specific props
   dailyProps: DailyModalProps;
@@ -79,16 +77,15 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
   showDailyModal,
   showChapterModal,
   showFreeRunModal,
-  showHintModal,
+  showHelperAdModal,
   showPointSystemModal,
   onCloseDailyModal,
   onCloseChapterModal,
   onCloseFreeRunModal,
-  onCloseHintModal,
+  onCloseHelperAdModal,
   onClosePointSystemModal,
+  onHelperUnlocked,
   gridType,
-  currentHint,
-  onApplyHint,
   dailyProps,
   chapterProps,
   freeRunProps,
@@ -136,12 +133,11 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
         />
       )}
 
-      {/* Smart Hint Modal */}
-      <SmartHintModal
-        visible={showHintModal}
-        hint={currentHint}
-        onClose={onCloseHintModal}
-        onApplyHint={onApplyHint}
+      {/* Helper Ad Modal - for unlocking Smart Possibility Helper */}
+      <HelperAdModal
+        visible={showHelperAdModal}
+        onClose={onCloseHelperAdModal}
+        onUnlocked={onHelperUnlocked}
       />
 
       {/* Point System Modal */}

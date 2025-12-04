@@ -8,7 +8,7 @@ import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
 import { getRandomPuzzle } from '../game/puzzles';
 import { GridType, Difficulty, GRID_CONFIGS } from '../game/types';
 import { isValidMove } from '../game/engine';
-import { analyzeForHint, SmartHint } from '../game/hintAnalyzer';
+import type { SmartHint } from '../game/hintAnalyzer';
 import type { ChapterInProgress } from '../services/chapterService';
 
 // Re-export types for convenience
@@ -31,6 +31,7 @@ export interface GameState {
   notes: Record<string, number[]>;
   history: string[];
   conflictCells: string[]; // Array of "row-col" strings
+  isHelperUnlocked: boolean; // Smart Possibility Helper unlocked for this game
 }
 
 export type { SmartHint } from '../game/hintAnalyzer';
@@ -74,8 +75,7 @@ interface GameContextType {
   resetBoard: () => void;
   pauseGame: () => void;
   resumeGame: () => void;
-  getSmartHint: () => SmartHint | null;
-  applyHint: (hint: SmartHint) => void;
+  unlockHelper: () => void;
   devAutoComplete: () => void;
   saveChapterProgress: (puzzleNumber: number) => Promise<void>;
   loadChapterProgress: () => Promise<ChapterInProgress | null>;
@@ -109,6 +109,7 @@ const createInitialState = (gridType: GridType = '9x9'): GameState => ({
   notes: {},
   history: [],
   conflictCells: [],
+  isHelperUnlocked: false,
 });
 
 /**
@@ -414,46 +415,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGameState(prev => prev ? ({ ...prev, isPaused: false }) : null);
   }, []);
 
-  const getSmartHint = useCallback((): SmartHint | null => {
-    if (!gameState || gameState.isLoading || gameState.isComplete) return null;
-    return analyzeForHint(gameState.grid, gameState.solution, gameState.gridType);
-  }, [gameState]);
-
-  const applyHint = useCallback((hint: SmartHint) => {
-    if (!gameState || gameState.isLoading) return;
-
-    const { row, col } = hint.cell;
-    const value = hint.value;
-
-    // Can't modify initial cells
-    if (gameState.initialGrid[row][col] !== 0) return;
-
-    // Deep copy grid
-    const newGrid = gameState.grid.map(r => [...r]);
-    newGrid[row][col] = value;
-
-    // Clear notes for this cell
-    const key = `${row}-${col}`;
-    const newNotes = { ...gameState.notes };
-    delete newNotes[key];
-
-    // Find conflicts
-    const conflictCells = findConflictCells(newGrid, gameState.gridType);
-
-    // Check for completion
-    const isComplete = newGrid.every((gridRow, r) =>
-      gridRow.every((cell, c) => cell === gameState.solution[r][c])
-    );
-
-    setGameState(prev => prev ? ({
-      ...prev,
-      grid: newGrid,
-      notes: newNotes,
-      conflictCells,
-      isComplete,
-      hintsUsed: prev.hintsUsed + 1,
-    }) : null);
-  }, [gameState]);
+  /**
+   * Unlock the Smart Possibility Helper for the current game.
+   * Called after user watches a rewarded ad.
+   */
+  const unlockHelper = useCallback(() => {
+    setGameState(prev => prev ? ({ ...prev, isHelperUnlocked: true }) : null);
+  }, []);
 
   // DEV ONLY: Auto-complete the puzzle with the solution
   const devAutoComplete = useCallback(() => {
@@ -495,8 +463,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       resetBoard,
       pauseGame,
       resumeGame,
-      getSmartHint,
-      applyHint,
+      unlockHelper,
       devAutoComplete,
       saveChapterProgress,
       loadChapterProgress,

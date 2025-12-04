@@ -23,6 +23,7 @@ interface NumberPadProps {
   disabled?: boolean;
   remainingCounts?: Record<number, number>;
   maxNumber?: number; // 6 for 6x6, 9 for 9x9
+  validNumbers?: Set<number>; // When provided, only these numbers are valid for selected cell
 }
 
 const { width, height } = Dimensions.get('window');
@@ -39,6 +40,7 @@ interface NumberButtonProps {
   onPress: () => void;
   disabled?: boolean;
   remaining?: number;
+  isInvalid?: boolean; // True when helper is active and number is not valid for selected cell
   buttonWidth: number;
   buttonHeight: number;
   fontSize?: number;
@@ -49,6 +51,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   onPress,
   disabled,
   remaining,
+  isInvalid,
   buttonWidth,
   buttonHeight,
   fontSize = 32,
@@ -56,6 +59,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   const { colors } = useTheme();
   const pressed = useSharedValue(0);
   const isComplete = remaining === 0;
+  const isDisabled = disabled || isComplete || isInvalid;
 
   const handlePressIn = useCallback(() => {
     pressed.value = withSpring(1, { damping: 15, stiffness: 500 });
@@ -66,11 +70,11 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   }, []);
 
   const handlePress = useCallback(() => {
-    if (!disabled && !isComplete) {
+    if (!isDisabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onPress();
     }
-  }, [disabled, isComplete, onPress]);
+  }, [isDisabled, onPress]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const scale = interpolate(pressed.value, [0, 1], [1, 0.95]);
@@ -80,12 +84,19 @@ const NumberButton: React.FC<NumberButtonProps> = ({
     };
   });
 
+  // Determine visual state: invalid (helper active) uses lower opacity than complete
+  const getOpacity = () => {
+    if (isInvalid) return 0.3;
+    if (isComplete) return 0.5;
+    return 1;
+  };
+
   return (
     <AnimatedPressable
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      disabled={disabled || isComplete}
+      disabled={isDisabled}
       style={[
         styles.button,
         {
@@ -94,7 +105,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
           backgroundColor: isComplete ? colors.highlight : colors.surface,
           borderColor: isComplete ? colors.highlightStrong : colors.primary,
           shadowColor: colors.primary,
-          opacity: isComplete ? 0.5 : 1,
+          opacity: getOpacity(),
         },
         animatedStyle,
       ]}
@@ -103,7 +114,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
         size={fontSize}
         bold
         mono
-        color={isComplete ? colors.muted : colors.text}
+        color={isDisabled ? colors.muted : colors.text}
       >
         {num.toString()}
       </BrutalistText>
@@ -116,6 +127,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
   disabled,
   remainingCounts,
   maxNumber = 9,
+  validNumbers,
 }) => {
   // On iPad: single row for all numbers
   // On iPhone: split into 2 rows (9x9: [1-5], [6-9] | 6x6: [1-3], [4-6])
@@ -158,6 +170,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
             onPress={() => onNumberPress(num)}
             disabled={disabled}
             remaining={remainingCounts?.[num]}
+            isInvalid={validNumbers ? !validNumbers.has(num) : false}
             buttonWidth={buttonWidth}
             buttonHeight={buttonHeight}
             fontSize={fontSize}
@@ -175,6 +188,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
               onPress={() => onNumberPress(num)}
               disabled={disabled}
               remaining={remainingCounts?.[num]}
+              isInvalid={validNumbers ? !validNumbers.has(num) : false}
               buttonWidth={buttonWidth}
               buttonHeight={buttonHeight}
               fontSize={fontSize}
