@@ -235,6 +235,7 @@ export default function GameScreen() {
       await chapterService.saveCompletion(internalUserId, {
         puzzleNumber,
         difficulty: gameState.difficulty,
+        gridType: gameState.gridType,
         puzzleGrid: gameState.initialGrid,
         solutionGrid: gameState.solution,
         timeSeconds: gameState.timer || 0,
@@ -371,15 +372,22 @@ export default function GameScreen() {
   // Handle free run play again
   const handleFreeRunPlayAgain = useCallback(async () => {
     if (!gameState) return;
+
+    // Save current game's parameters before clearing
+    const currentDifficulty = gameState.difficulty;
+    const currentGridType = gameState.gridType;
+
     // Record the completed game to game_sessions
     await saveFreeRunCompletion();
     // Clear saved Free Run state since we're starting fresh
     await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
 
-    // Go back to Free Run screen (game limit is checked there before starting)
+    // Close the modal
     modals.closeFreeRunModal();
-    router.back();
-  }, [gameState, modals, saveFreeRunCompletion, router]);
+
+    // Start a new game with the same difficulty and grid type
+    startNewGame(currentDifficulty, currentGridType);
+  }, [gameState, modals, saveFreeRunCompletion, startNewGame]);
 
   // Handle back to free run
   const handleBackToFreeRun = useCallback(async () => {
