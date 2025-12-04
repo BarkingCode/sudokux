@@ -1,14 +1,13 @@
 /**
  * Manages and renders all game-related modals.
- * Centralizes modal rendering for Daily, Chapter, FreeRun completion and hints.
+ * Centralizes modal rendering for Daily, Chapter, FreeRun completion and helper unlock.
  */
 
 import React from 'react';
 import { DailyCompletionModal } from '../DailyCompletionModal';
 import { ChapterCompletionModal } from '../ChapterCompletionModal';
 import { FreeRunCompletionModal } from '../FreeRunCompletionModal';
-import { SmartHintModal } from '../SmartHintModal';
-import type { SmartHint } from '../../game/hintAnalyzer';
+import { HelperAdModal } from '../HelperAdModal';
 import type { Difficulty, GridType } from '../../context/GameContext';
 import type { DailyChallenge } from '../../services/dailyChallengeService';
 
@@ -48,17 +47,16 @@ interface GameModalsManagerProps {
   showDailyModal: boolean;
   showChapterModal: boolean;
   showFreeRunModal: boolean;
-  showHintModal: boolean;
+  showHelperAdModal: boolean;
 
   // Modal close handlers
   onCloseDailyModal: () => void;
   onCloseChapterModal: () => void;
   onCloseFreeRunModal: () => void;
-  onCloseHintModal: () => void;
+  onCloseHelperAdModal: () => void;
 
-  // Hint
-  currentHint: SmartHint | null;
-  onApplyHint: () => void;
+  // Helper unlock callback
+  onHelperUnlocked: () => void;
 
   // Modal-specific props
   dailyProps: DailyModalProps;
@@ -73,13 +71,12 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
   showDailyModal,
   showChapterModal,
   showFreeRunModal,
-  showHintModal,
+  showHelperAdModal,
   onCloseDailyModal,
   onCloseChapterModal,
   onCloseFreeRunModal,
-  onCloseHintModal,
-  currentHint,
-  onApplyHint,
+  onCloseHelperAdModal,
+  onHelperUnlocked,
   dailyProps,
   chapterProps,
   freeRunProps,
@@ -127,12 +124,11 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
         />
       )}
 
-      {/* Smart Hint Modal */}
-      <SmartHintModal
-        visible={showHintModal}
-        hint={currentHint}
-        onClose={onCloseHintModal}
-        onApplyHint={onApplyHint}
+      {/* Helper Ad Modal - for unlocking Smart Possibility Helper */}
+      <HelperAdModal
+        visible={showHelperAdModal}
+        onClose={onCloseHelperAdModal}
+        onUnlocked={onHelperUnlocked}
       />
     </>
   );

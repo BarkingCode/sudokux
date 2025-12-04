@@ -4,14 +4,11 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import type { SmartHint } from '../game/hintAnalyzer';
 
 export interface GameModalsState {
   showDailyModal: boolean;
   showChapterModal: boolean;
   showFreeRunModal: boolean;
-  showHintModal: boolean;
-  currentHint: SmartHint | null;
 }
 
 export interface GameModalsActions {
@@ -21,8 +18,6 @@ export interface GameModalsActions {
   closeChapterModal: () => void;
   openFreeRunModal: () => void;
   closeFreeRunModal: () => void;
-  openHintModal: (hint: SmartHint) => void;
-  closeHintModal: () => void;
   resetAllModals: () => void;
 }
 
@@ -37,8 +32,6 @@ export const useGameModals = (): UseGameModalsReturn => {
   const [showDailyModal, setShowDailyModal] = useState(false);
   const [showChapterModal, setShowChapterModal] = useState(false);
   const [showFreeRunModal, setShowFreeRunModal] = useState(false);
-  const [showHintModal, setShowHintModal] = useState(false);
-  const [currentHint, setCurrentHint] = useState<SmartHint | null>(null);
 
   // Refs to track if modals have been shown (prevent duplicate shows)
   const hasShownDailyModal = useRef(false);
@@ -55,15 +48,6 @@ export const useGameModals = (): UseGameModalsReturn => {
   const openFreeRunModal = useCallback(() => setShowFreeRunModal(true), []);
   const closeFreeRunModal = useCallback(() => setShowFreeRunModal(false), []);
 
-  const openHintModal = useCallback((hint: SmartHint) => {
-    setCurrentHint(hint);
-    setShowHintModal(true);
-  }, []);
-
-  const closeHintModal = useCallback(() => {
-    setShowHintModal(false);
-  }, []);
-
   const resetAllModals = useCallback(() => {
     hasShownCompletionAd.current = false;
     hasShownDailyModal.current = false;
@@ -76,8 +60,6 @@ export const useGameModals = (): UseGameModalsReturn => {
     showDailyModal,
     showChapterModal,
     showFreeRunModal,
-    showHintModal,
-    currentHint,
     // Actions
     openDailyModal,
     closeDailyModal,
@@ -85,8 +67,6 @@ export const useGameModals = (): UseGameModalsReturn => {
     closeChapterModal,
     openFreeRunModal,
     closeFreeRunModal,
-    openHintModal,
-    closeHintModal,
     resetAllModals,
     // Refs
     hasShownDailyModal,

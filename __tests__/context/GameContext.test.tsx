@@ -50,17 +50,6 @@ jest.mock('../../src/game/puzzles', () => ({
   ),
 }));
 
-// Mock hintAnalyzer
-jest.mock('../../src/game/hintAnalyzer', () => ({
-  analyzeForHint: jest.fn(() => ({
-    technique: 'naked_single',
-    cell: { row: 0, col: 2 },
-    value: 4,
-    explanation: 'Test hint',
-    highlightCells: [{ row: 0, col: 2, type: 'primary' }],
-  })),
-}));
-
 import { loadData, saveData } from '../../src/utils/storage';
 import { getRandomPuzzle } from '../../src/game/puzzles';
 
@@ -504,10 +493,10 @@ describe('GameContext', () => {
     });
   });
 
-  // ============ Hints ============
+  // ============ Smart Possibility Helper ============
 
-  describe('getSmartHint / applyHint', () => {
-    it('should return a hint', async () => {
+  describe('unlockHelper', () => {
+    it('should have isHelperUnlocked false initially', async () => {
       const { result } = renderHook(() => useGame(), { wrapper });
 
       await act(async () => {
@@ -515,14 +504,10 @@ describe('GameContext', () => {
         await Promise.resolve();
       });
 
-      const hint = result.current.getSmartHint();
-
-      expect(hint).not.toBeNull();
-      expect(hint?.cell).toBeDefined();
-      expect(hint?.value).toBeDefined();
+      expect(result.current.gameState?.isHelperUnlocked).toBe(false);
     });
 
-    it('should increment hintsUsed when applying hint', async () => {
+    it('should unlock helper when unlockHelper is called', async () => {
       const { result } = renderHook(() => useGame(), { wrapper });
 
       await act(async () => {
@@ -530,20 +515,14 @@ describe('GameContext', () => {
         await Promise.resolve();
       });
 
-      expect(result.current.gameState?.hintsUsed).toBe(0);
-
-      const hint = result.current.getSmartHint();
-
       await act(async () => {
-        if (hint) {
-          result.current.applyHint(hint);
-        }
+        result.current.unlockHelper();
       });
 
-      expect(result.current.gameState?.hintsUsed).toBe(1);
+      expect(result.current.gameState?.isHelperUnlocked).toBe(true);
     });
 
-    it('should place hint value in grid', async () => {
+    it('should reset helper state on new game', async () => {
       const { result } = renderHook(() => useGame(), { wrapper });
 
       await act(async () => {
@@ -551,15 +530,18 @@ describe('GameContext', () => {
         await Promise.resolve();
       });
 
-      const hint = result.current.getSmartHint();
+      await act(async () => {
+        result.current.unlockHelper();
+      });
 
-      if (hint) {
-        await act(async () => {
-          result.current.applyHint(hint);
-        });
+      expect(result.current.gameState?.isHelperUnlocked).toBe(true);
 
-        expect(result.current.gameState?.grid[hint.cell.row][hint.cell.col]).toBe(hint.value);
-      }
+      await act(async () => {
+        result.current.startNewGame('medium', '9x9');
+        await Promise.resolve();
+      });
+
+      expect(result.current.gameState?.isHelperUnlocked).toBe(false);
     });
   });
 
