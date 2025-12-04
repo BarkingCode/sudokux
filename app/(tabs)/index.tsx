@@ -28,6 +28,7 @@ import { loadData, saveData, loadSecureData, STORAGE_KEYS } from '../../src/util
 import { chapterService, ChapterInProgress } from '../../src/services/chapterService';
 import { getChapterPuzzle } from '../../src/game/chapterPuzzles';
 import type { ChapterCompletion } from '../../src/lib/database.types';
+import type { GridType } from '../../src/game/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -46,13 +47,14 @@ const DOTS_BETWEEN = 4;
 /**
  * Get difficulty for a specific puzzle number.
  * Difficulty increases as puzzles progress.
+ * 30 puzzles per difficulty level.
  */
 const getPuzzleDifficulty = (puzzleNum: number): Difficulty => {
-  if (puzzleNum <= 20) return 'easy';
-  if (puzzleNum <= 40) return 'medium';
-  if (puzzleNum <= 60) return 'hard';
-  if (puzzleNum <= 80) return 'extreme';
-  if (puzzleNum <= 100) return 'insane';
+  if (puzzleNum <= 30) return 'easy';
+  if (puzzleNum <= 60) return 'medium';
+  if (puzzleNum <= 90) return 'hard';
+  if (puzzleNum <= 120) return 'extreme';
+  if (puzzleNum <= 150) return 'insane';
   return 'inhuman';
 };
 
@@ -111,6 +113,11 @@ const PulsingRing: React.FC<{ color: string }> = ({ color }) => {
   );
 };
 
+// Helper to get storage key for chapter progress based on grid type
+const getProgressStorageKey = (gridType: GridType): string => {
+  return gridType === '6x6' ? STORAGE_KEYS.CHAPTER_PROGRESS_6X6 : STORAGE_KEYS.CHAPTER_PROGRESS;
+};
+
 export default function ChaptersScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
@@ -120,6 +127,7 @@ export default function ChaptersScreen() {
   const [totalPuzzles, setTotalPuzzles] = useState(INITIAL_PUZZLES);
   const [userId, setUserId] = useState<string | null>(null);
   const [completions, setCompletions] = useState<Map<number, ChapterCompletion>>(new Map());
+  const [selectedGridType, setSelectedGridType] = useState<GridType>('9x9');
   const scrollRef = useRef<ScrollView>(null);
 
   // Add more puzzles as user progresses
@@ -129,9 +137,11 @@ export default function ChaptersScreen() {
     }
   }, [progress.currentPuzzle, totalPuzzles]);
 
-  // Load user ID on mount
+  // Load user ID and grid type preference on mount
   useEffect(() => {
-    loadSecureData(STORAGE_KEYS.USER_ID).then((storedData) => {
+    const loadInitialState = async () => {
+      // Load user ID
+      const storedData = await loadSecureData(STORAGE_KEYS.USER_ID);
       if (storedData) {
         try {
           const identity = JSON.parse(storedData);
@@ -140,31 +150,66 @@ export default function ChaptersScreen() {
           setUserId(null);
         }
       }
-    });
+
+      // Load saved grid type preference
+      const savedGridType = await loadData<GridType>(STORAGE_KEYS.CHAPTER_GRID_TYPE);
+      if (savedGridType === '6x6' || savedGridType === '9x9') {
+        setSelectedGridType(savedGridType);
+      }
+    };
+    loadInitialState();
   }, []);
 
-  // Load completions from Supabase when userId is available
+  // Load completions from Supabase when userId or gridType changes
   useEffect(() => {
     if (userId) {
-      chapterService.getAllCompletions(userId).then((data) => {
+      chapterService.getAllCompletions(userId, selectedGridType).then((data) => {
         const completionsMap = new Map<number, ChapterCompletion>();
         data.forEach((c) => completionsMap.set(c.puzzle_number, c));
         setCompletions(completionsMap);
       });
     }
-  }, [userId]);
+  }, [userId, selectedGridType]);
+
+  // Handle grid type toggle
+  const handleGridTypeToggle = useCallback(async (newGridType: GridType) => {
+    if (newGridType === selectedGridType) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsLoading(true);
+
+    // Save the new grid type preference
+    await saveData(STORAGE_KEYS.CHAPTER_GRID_TYPE, newGridType);
+    setSelectedGridType(newGridType);
+
+    // Load progress for the new grid type
+    const storageKey = getProgressStorageKey(newGridType);
+    const saved = await loadData<GameProgress>(storageKey);
+    setProgress(saved || DEFAULT_PROGRESS);
+
+    // Reload completions for the new grid type
+    if (userId) {
+      const data = await chapterService.getAllCompletions(userId, newGridType);
+      const completionsMap = new Map<number, ChapterCompletion>();
+      data.forEach((c) => completionsMap.set(c.puzzle_number, c));
+      setCompletions(completionsMap);
+    }
+
+    setIsLoading(false);
+  }, [selectedGridType, userId]);
 
   // Load progress on mount and when screen is focused (returning from game)
   useFocusEffect(
     useCallback(() => {
       const loadAndSync = async () => {
-        // Load local progress first
-        const saved = await loadData<GameProgress>(STORAGE_KEYS.CHAPTER_PROGRESS);
+        // Load local progress for the selected grid type
+        const storageKey = getProgressStorageKey(selectedGridType);
+        const saved = await loadData<GameProgress>(storageKey);
         let currentProgress = DEFAULT_PROGRESS;
 
         if (saved) {
-          // Migration: handle old format
-          if ((saved as any).currentChapter !== undefined) {
+          // Migration: handle old format (only for 9x9)
+          if (selectedGridType === '9x9' && (saved as any).currentChapter !== undefined) {
             // Old format - convert
             const oldProgress = saved as any;
             currentProgress = {
@@ -184,9 +229,9 @@ export default function ChaptersScreen() {
           }
         }
 
-        // Reload completions from DB and sync with local progress
+        // Reload completions from DB for the selected grid type and sync with local progress
         if (userId) {
-          const data = await chapterService.getAllCompletions(userId);
+          const data = await chapterService.getAllCompletions(userId, selectedGridType);
           const completionsMap = new Map<number, ChapterCompletion>();
           data.forEach((c) => completionsMap.set(c.puzzle_number, c));
           setCompletions(completionsMap);
@@ -225,15 +270,16 @@ export default function ChaptersScreen() {
       };
 
       loadAndSync();
-    }, [userId])
+    }, [userId, selectedGridType])
   );
 
   // Save progress when it changes
   useEffect(() => {
     if (!isLoading) {
-      saveData(STORAGE_KEYS.CHAPTER_PROGRESS, progress);
+      const storageKey = getProgressStorageKey(selectedGridType);
+      saveData(storageKey, progress);
     }
-  }, [progress, isLoading]);
+  }, [progress, isLoading, selectedGridType]);
 
   // Note: Progress is now updated by GameScreen when user completes a puzzle
   // and presses "Continue" or "Back to Chapters" in the completion modal.
@@ -304,7 +350,7 @@ export default function ChaptersScreen() {
         loadSavedPuzzle({
           puzzleId: `chapter-${puzzleNum}-completed`,
           difficulty: savedCompletion.difficulty as Difficulty,
-          gridType: '9x9',
+          gridType: selectedGridType,
           puzzle: solutionGrid,  // Show the solved puzzle
           solution: solutionGrid,
         });
@@ -322,11 +368,11 @@ export default function ChaptersScreen() {
       } else {
         // Fallback: Invalid saved data, generate fresh puzzle
         console.warn('[ChaptersScreen] Invalid completion data, generating new puzzle');
-        const puzzle = getChapterPuzzle(puzzleNum, '9x9');
+        const puzzle = getChapterPuzzle(puzzleNum, selectedGridType);
         loadSavedPuzzle({
           puzzleId: `chapter-${puzzleNum}`,
           difficulty: puzzle.difficulty,
-          gridType: '9x9',
+          gridType: selectedGridType,
           puzzle: puzzle.puzzle,
           solution: puzzle.solution,
         });
@@ -344,8 +390,8 @@ export default function ChaptersScreen() {
       // NEW/IN-PROGRESS PUZZLE: Check for saved in-progress data first
       const inProgressData = await loadData<ChapterInProgress>(STORAGE_KEYS.CHAPTER_IN_PROGRESS);
 
-      if (inProgressData && inProgressData.puzzleNumber === puzzleNum) {
-        // Resume from saved progress
+      if (inProgressData && inProgressData.puzzleNumber === puzzleNum && inProgressData.gridType === selectedGridType) {
+        // Resume from saved progress (only if same grid type)
         console.log('[ChaptersScreen] Resuming in-progress puzzle', puzzleNum);
         loadSavedPuzzleWithProgress({
           puzzleId: `chapter-${puzzleNum}`,
@@ -363,11 +409,11 @@ export default function ChaptersScreen() {
         });
       } else {
         // Generate fresh deterministic puzzle
-        const puzzle = getChapterPuzzle(puzzleNum, '9x9');
+        const puzzle = getChapterPuzzle(puzzleNum, selectedGridType);
         loadSavedPuzzle({
           puzzleId: `chapter-${puzzleNum}`,
           difficulty: puzzle.difficulty,
-          gridType: '9x9',
+          gridType: selectedGridType,
           puzzle: puzzle.puzzle,
           solution: puzzle.solution,
         });
@@ -382,7 +428,7 @@ export default function ChaptersScreen() {
         },
       });
     }
-  }, [progress, loadSavedPuzzle, loadSavedPuzzleWithProgress, router, completions]);
+  }, [progress, loadSavedPuzzle, loadSavedPuzzleWithProgress, router, completions, selectedGridType]);
 
   // Generate path layout - zigzag pattern flowing UPWARD
   const pathData = useMemo(() => {
@@ -485,6 +531,48 @@ export default function ChaptersScreen() {
             </BrutalistText>
           </View>
         </View>
+      </View>
+
+      {/* Grid Type Toggle */}
+      <View style={styles.gridToggleContainer}>
+        <Pressable
+          onPress={() => handleGridTypeToggle('9x9')}
+          style={[
+            styles.gridToggleButton,
+            {
+              backgroundColor: selectedGridType === '9x9' ? colors.primary : colors.background,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <BrutalistText
+            size={12}
+            bold
+            mono
+            color={selectedGridType === '9x9' ? colors.background : colors.text}
+          >
+            9x9
+          </BrutalistText>
+        </Pressable>
+        <Pressable
+          onPress={() => handleGridTypeToggle('6x6')}
+          style={[
+            styles.gridToggleButton,
+            {
+              backgroundColor: selectedGridType === '6x6' ? colors.primary : colors.background,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <BrutalistText
+            size={12}
+            bold
+            mono
+            color={selectedGridType === '6x6' ? colors.background : colors.text}
+          >
+            6x6
+          </BrutalistText>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -612,6 +700,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 2,
+  },
+  gridToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 0,
+    paddingBottom: 12,
+  },
+  gridToggleButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderWidth: 2,
+    minWidth: 70,
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,

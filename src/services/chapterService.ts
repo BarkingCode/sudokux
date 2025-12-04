@@ -16,6 +16,7 @@ type ChapterCompletionRow = ChapterCompletion;
 export interface ChapterPuzzleData {
   puzzleNumber: number;
   difficulty: string;
+  gridType: string;
   puzzleGrid: number[][];
   solutionGrid: number[][];
   timeSeconds: number;
@@ -85,6 +86,7 @@ class ChapterService {
         user_id: userId,
         puzzle_number: puzzleData.puzzleNumber,
         difficulty: puzzleData.difficulty,
+        grid_type: puzzleData.gridType,
         puzzle_grid: JSON.stringify(puzzleData.puzzleGrid),
         solution_grid: JSON.stringify(puzzleData.solutionGrid),
         time_seconds: puzzleData.timeSeconds,
@@ -94,10 +96,11 @@ class ChapterService {
 
       // Upsert - update if exists, insert if not
       // Note: Using 'as any' because the table isn't in generated types yet
+      // Conflict on user_id, puzzle_number, and grid_type (allows separate progress per grid type)
       const { data, error } = await (supabase
         .from('chapter_completions' as any)
         .upsert(completion as any, {
-          onConflict: 'user_id,puzzle_number',
+          onConflict: 'user_id,puzzle_number,grid_type',
         })
         .select()
         .single());
@@ -165,19 +168,27 @@ class ChapterService {
 
   /**
    * Get all completed chapter puzzles for a user
+   * @param internalUserId - The user's internal ID
+   * @param gridType - Optional grid type to filter by ('6x6' or '9x9')
    */
-  async getAllCompletions(internalUserId: string): Promise<ChapterCompletion[]> {
+  async getAllCompletions(internalUserId: string, gridType?: string): Promise<ChapterCompletion[]> {
     try {
       const userId = await this.getUserId(internalUserId);
       if (!userId) {
         return [];
       }
 
-      const { data, error } = await (supabase
+      let query = supabase
         .from('chapter_completions' as any)
         .select('*')
-        .eq('user_id', userId)
-        .order('puzzle_number', { ascending: true }));
+        .eq('user_id', userId);
+
+      // Filter by grid type if specified
+      if (gridType) {
+        query = query.eq('grid_type', gridType);
+      }
+
+      const { data, error } = await query.order('puzzle_number', { ascending: true });
 
       if (error || !data) {
         return [];
@@ -185,9 +196,10 @@ class ChapterService {
 
       const typedData = data as unknown as ChapterCompletion[];
 
-      // Update cache
+      // Update cache (keyed by puzzle number + grid type)
       typedData.forEach((completion) => {
-        this.cache.set(completion.puzzle_number, completion);
+        const cacheKey = gridType ? completion.puzzle_number * 10 + (gridType === '6x6' ? 1 : 0) : completion.puzzle_number;
+        this.cache.set(cacheKey, completion);
       });
 
       return typedData;

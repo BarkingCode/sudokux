@@ -14,19 +14,19 @@ import { Difficulty, GridType, GeneratedPuzzle } from './types';
  * Difficulty increases as puzzles progress.
  *
  * Puzzle ranges:
- * - 1-20: easy
- * - 21-40: medium
- * - 41-60: hard
- * - 61-80: extreme
- * - 81-100: insane
- * - 101+: inhuman
+ * - 1-30: easy
+ * - 31-60: medium
+ * - 61-90: hard
+ * - 91-120: extreme
+ * - 121-150: insane
+ * - 151+: inhuman
  */
 export const getChapterDifficulty = (puzzleNumber: number): Difficulty => {
-  if (puzzleNumber <= 20) return 'easy';
-  if (puzzleNumber <= 40) return 'medium';
-  if (puzzleNumber <= 60) return 'hard';
-  if (puzzleNumber <= 80) return 'extreme';
-  if (puzzleNumber <= 100) return 'insane';
+  if (puzzleNumber <= 30) return 'easy';
+  if (puzzleNumber <= 60) return 'medium';
+  if (puzzleNumber <= 90) return 'hard';
+  if (puzzleNumber <= 120) return 'extreme';
+  if (puzzleNumber <= 150) return 'insane';
   return 'inhuman';
 };
 

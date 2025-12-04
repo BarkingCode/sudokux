@@ -9,8 +9,9 @@
 
 import { supabase } from '../lib/supabase';
 import type { Difficulty } from '../lib/database.types';
+import type { GridType } from '../game/types';
 
-// Point values per difficulty (exponential scaling)
+// Point values per difficulty for 9x9 grids (exponential scaling)
 export const DIFFICULTY_POINTS: Record<Difficulty, number> = {
   easy: 10,
   medium: 25,
@@ -18,6 +19,26 @@ export const DIFFICULTY_POINTS: Record<Difficulty, number> = {
   extreme: 100,
   insane: 200,
   inhuman: 500,
+};
+
+// Point values per difficulty for 6x6 grids (half of 9x9)
+export const DIFFICULTY_POINTS_6X6: Record<Difficulty, number> = {
+  easy: 5,
+  medium: 12,
+  hard: 25,
+  extreme: 50,
+  insane: 100,
+  inhuman: 250,
+};
+
+/**
+ * Get points for a specific difficulty and grid type
+ */
+export const getPointsForDifficulty = (difficulty: Difficulty, gridType: GridType = '9x9'): number => {
+  if (gridType === '6x6') {
+    return DIFFICULTY_POINTS_6X6[difficulty] || 0;
+  }
+  return DIFFICULTY_POINTS[difficulty] || 0;
 };
 
 export interface PointsLeaderboardEntry {
@@ -208,9 +229,11 @@ class PointService {
 
   /**
    * Calculate points for a completed game
+   * @param difficulty - Game difficulty level
+   * @param gridType - Grid type ('6x6' or '9x9'). 6x6 gives half points.
    */
-  calculateGamePoints(difficulty: Difficulty): number {
-    return DIFFICULTY_POINTS[difficulty] || 0;
+  calculateGamePoints(difficulty: Difficulty, gridType: GridType = '9x9'): number {
+    return getPointsForDifficulty(difficulty, gridType);
   }
 
   /**

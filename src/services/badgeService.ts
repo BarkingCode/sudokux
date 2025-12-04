@@ -49,25 +49,13 @@ class BadgeService {
   /**
    * Update badge based on daily challenge status
    * Call this on app launch and when daily status changes
+   *
+   * Note: Currently we always clear the badge as per user preference.
+   * No number badge is shown on the app icon - notifications are used instead.
    */
   async updateDailyBadge(userId: string | null): Promise<void> {
-    if (!userId) {
-      await this.clearBadge();
-      return;
-    }
-
-    try {
-      const completed = await hasCompletedToday(userId);
-      if (completed) {
-        await this.clearBadge();
-      } else {
-        await this.setDailyPending();
-      }
-    } catch (error) {
-      console.error('Error updating daily badge:', error);
-      // Don't show badge if we can't determine status
-      await this.clearBadge();
-    }
+    // Always clear badge - we use push notifications instead of badges
+    await this.clearBadge();
   }
 
   /**

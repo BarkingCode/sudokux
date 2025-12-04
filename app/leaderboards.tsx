@@ -13,7 +13,7 @@ import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 import { BrutalistText } from '../src/components/BrutalistText';
 import { useTheme } from '../src/context/ThemeContext';
-import { pointService, type PointsLeaderboardEntry, type UserPointsRank, DIFFICULTY_POINTS } from '../src/services/pointService';
+import { pointService, type PointsLeaderboardEntry, type UserPointsRank, DIFFICULTY_POINTS, DIFFICULTY_POINTS_6X6 } from '../src/services/pointService';
 import { gameCenterService } from '../src/services/gameCenter';
 import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
 import { statsService } from '../src/services/statsService';
@@ -288,7 +288,10 @@ export default function LeaderboardsScreen() {
       {/* Points Info */}
       <Animated.View entering={FadeInUp.delay(175).springify()} style={styles.pointsInfoContainer}>
         <BrutalistText size={10} mono muted center>
-          Points per puzzle: Easy={DIFFICULTY_POINTS.easy} | Med={DIFFICULTY_POINTS.medium} | Hard={DIFFICULTY_POINTS.hard} | Ext={DIFFICULTY_POINTS.extreme} | Ins={DIFFICULTY_POINTS.insane} | Inh={DIFFICULTY_POINTS.inhuman}
+          9x9: Easy={DIFFICULTY_POINTS.easy} | Med={DIFFICULTY_POINTS.medium} | Hard={DIFFICULTY_POINTS.hard} | Ext={DIFFICULTY_POINTS.extreme} | Ins={DIFFICULTY_POINTS.insane} | Inh={DIFFICULTY_POINTS.inhuman}
+        </BrutalistText>
+        <BrutalistText size={10} mono muted center style={{ marginTop: 2 }}>
+          6x6: Easy={DIFFICULTY_POINTS_6X6.easy} | Med={DIFFICULTY_POINTS_6X6.medium} | Hard={DIFFICULTY_POINTS_6X6.hard} | Ext={DIFFICULTY_POINTS_6X6.extreme} | Ins={DIFFICULTY_POINTS_6X6.insane} | Inh={DIFFICULTY_POINTS_6X6.inhuman}
         </BrutalistText>
       </Animated.View>
 
