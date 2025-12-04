@@ -132,11 +132,20 @@ Achievements shown on Board screen:
 ### pointService.ts
 
 ```typescript
-// Point values per difficulty (exponential scaling)
+// Point values per difficulty for 9×9 (exponential scaling)
 const DIFFICULTY_POINTS = {
   easy: 10, medium: 25, hard: 50,
   extreme: 100, insane: 200, inhuman: 500
 };
+
+// Point values per difficulty for 6×6 (half of 9×9)
+const DIFFICULTY_POINTS_6X6 = {
+  easy: 5, medium: 12, hard: 25,
+  extreme: 50, insane: 100, inhuman: 250
+};
+
+// Get points for a difficulty and grid type
+getPointsForDifficulty(difficulty: Difficulty, gridType: GridType = '9x9'): number
 
 // Get global points leaderboard
 getGlobalLeaderboard(limit?: number, offset?: number): Promise<PointsLeaderboardEntry[]>

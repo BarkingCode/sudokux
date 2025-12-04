@@ -2,7 +2,9 @@
 
 ## Overview
 
-Display a badge on the app icon when the user has not completed today's daily challenge, encouraging daily engagement.
+~~Display a badge on the app icon when the user has not completed today's daily challenge, encouraging daily engagement.~~
+
+**Current Implementation:** App badge is always cleared on app open. We use push notifications instead of badge numbers to notify users of new daily challenges.
 
 ## Requirements
 
@@ -10,9 +12,9 @@ Display a badge on the app icon when the user has not completed today's daily ch
 
 | Condition | Badge |
 |-----------|-------|
-| Daily challenge not completed | Show badge (number: 1) |
-| Daily challenge completed | Remove badge |
-| App opened | Check and update badge |
+| App opened | Always clear badge (0) |
+| Daily challenge completed | Badge already cleared |
+| Push notification received | No number badge set |
 
 ### Implementation
 
@@ -21,30 +23,42 @@ Use `expo-notifications` for badge management:
 ```typescript
 import * as Notifications from 'expo-notifications';
 
-// Set badge when daily not completed
-await Notifications.setBadgeCountAsync(1);
+// Always clear badge on app open (in _layout.tsx)
+useEffect(() => {
+  Notifications.setBadgeCountAsync(0);
+}, []);
 
-// Clear badge after completion
-await Notifications.setBadgeCountAsync(0);
+// Badge service always clears (no number badge)
+async updateDailyBadge(userId: string | null): Promise<void> {
+  await this.clearBadge();
+}
 ```
 
 ### Trigger Points
 
-1. **App launch** - Check if today's daily is complete
-2. **Midnight rollover** - Set badge for new day (via background task or push)
-3. **Daily challenge completion** - Clear badge immediately
-4. **Push notification** - Include badge count in payload
+1. **App launch** - Clear badge immediately
+2. **Daily challenge completion** - Badge already cleared
+3. **Push notification** - Notification only, no badge number
 
-### Background Updates
+### Push Notifications (No Badge)
 
 ```typescript
-// In daily challenge cron job / push notification
+// Push notifications do NOT set badge numbers
 const pushPayload = {
   title: "Daily Challenge Ready!",
   body: "Your daily Sudoku challenge is waiting",
   data: { type: 'daily_challenge' },
-  badge: 1, // iOS badge count
+  // No badge field - we don't use number badges
 };
+
+// Notification handler configured to not set badge
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false, // Never set badge from notifications
+  }),
+});
 ```
 
 ### Platform Considerations
@@ -67,9 +81,9 @@ const pushPayload = {
 
 ## Acceptance Criteria
 
-- [ ] Badge appears when daily challenge is pending
-- [ ] Badge clears immediately on completion
-- [ ] Badge resets at midnight (user's timezone)
-- [ ] Works on iOS
-- [ ] Android support where available
-- [ ] Respects notification permissions
+- [x] Badge clears immediately on app open
+- [x] No number badge displayed on app icon
+- [x] Push notifications work without setting badge
+- [x] Works on iOS
+- [x] Android support where available
+- [x] Respects notification permissions

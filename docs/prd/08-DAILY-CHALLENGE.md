@@ -68,9 +68,26 @@ If no server puzzle exists for the local date, the app generates one using:
 ## Daily Challenge Features
 
 * **Leaderboard:** Fastest completion times for today's puzzle
-* **Streak tracking:** Consecutive days completed
+* **Streak tracking:** Consecutive days completed (based on user's local timezone)
 * **One attempt:** Cannot replay same day's puzzle
 * **Offline support:** Cache today's puzzle on app open
+
+## Streak Calculation
+
+Daily streak is calculated based on user's **local timezone**:
+
+| Scenario | Result |
+|----------|--------|
+| Last completed = yesterday (local) | Increment streak |
+| Last completed = today (local) | Keep current streak (no double-counting) |
+| Last completed = 2+ days ago | Reset streak to 1 |
+| First ever completion | Start streak at 1 |
+
+**Implementation:**
+- Uses `getLocalDateString()` for consistent local date comparison
+- `getYesterdayLocalDateString()` for previous day check
+- Handles edge cases like completing at 11:59pm vs 12:01am correctly
+- Stored in `user_stats.daily_streak` and `user_stats.best_daily_streak`
 
 ## Push Notifications (Cron Job)
 
