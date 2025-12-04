@@ -31,14 +31,24 @@ export const DIFFICULTY_POINTS_6X6: Record<Difficulty, number> = {
   inhuman: 250,
 };
 
-// Mistake penalties per difficulty (currently 0 - no penalty for mistakes)
+// Mistake penalties per difficulty for 9x9 grids (points deducted per mistake)
 export const MISTAKE_PENALTIES: Record<Difficulty, number> = {
-  easy: 0,
-  medium: 0,
-  hard: 0,
-  extreme: 0,
-  insane: 0,
-  inhuman: 0,
+  easy: -1,
+  medium: -2,
+  hard: -3,
+  extreme: -4,
+  insane: -5,
+  inhuman: -6,
+};
+
+// Mistake penalties for 6x6 grids (same as 9x9, mistakes are equally punished)
+export const MISTAKE_PENALTIES_6X6: Record<Difficulty, number> = {
+  easy: -1,
+  medium: -2,
+  hard: -3,
+  extreme: -4,
+  insane: -5,
+  inhuman: -6,
 };
 
 // Helper penalties per difficulty (points deducted when using helper)
@@ -77,10 +87,11 @@ export const getPointInfoForDifficulty = (
   difficulty: Difficulty,
   gridType: GridType = '9x9'
 ): PointInfo => {
+  const mistakePenalties = gridType === '6x6' ? MISTAKE_PENALTIES_6X6 : MISTAKE_PENALTIES;
   const helperPenalties = gridType === '6x6' ? HELPER_PENALTIES_6X6 : HELPER_PENALTIES;
   return {
     gamePoints: getPointsForDifficulty(difficulty, gridType),
-    mistakePenalty: MISTAKE_PENALTIES[difficulty],
+    mistakePenalty: mistakePenalties[difficulty],
     helperPenalty: helperPenalties[difficulty],
   };
 };
