@@ -27,7 +27,8 @@ import { SolveTimeTrends, calculateSolveTimeTrends } from '../../src/components/
 import { PointSystemModal } from '../../src/components/PointSystemModal';
 import { useTheme } from '../../src/context/ThemeContext';
 import { statsService } from '../../src/services/statsService';
-import { pointService, type PointsLeaderboardEntry, type UserPointsRank } from '../../src/services/pointService';
+import { pointService, getPointInfoForDifficulty, type PointsLeaderboardEntry, type UserPointsRank } from '../../src/services/pointService';
+import type { Difficulty, GridType } from '../../src/lib/database.types';
 import { loadSecureData, STORAGE_KEYS } from '../../src/utils/storage';
 import { ACHIEVEMENTS } from '../../src/data/achievements';
 import type { UserStats, GameSession } from '../../src/lib/database.types';
@@ -62,6 +63,23 @@ const formatDate = (dateString: string): string => {
     month: 'short',
     day: 'numeric',
   });
+};
+
+const getGameType = (puzzleId: string): string => {
+  if (puzzleId.startsWith('daily-')) return 'Daily';
+  if (puzzleId.startsWith('chapter-')) return 'Chapter';
+  return 'Free Run';
+};
+
+const calculateGamePoints = (game: GameSession): number => {
+  if (!game.completed) return 0;
+  const info = getPointInfoForDifficulty(
+    game.difficulty as Difficulty,
+    (game.grid_type || '9x9') as GridType
+  );
+  const mistakePenalty = (game.mistakes || 0) * Math.abs(info.mistakePenalty);
+  const helperPenalty = (game.hints_used || 0) * Math.abs(info.helperPenalty);
+  return Math.max(0, info.gamePoints - mistakePenalty - helperPenalty);
 };
 
 export default function BoardScreen() {
@@ -362,7 +380,11 @@ export default function BoardScreen() {
                     >
                       <View style={styles.recentGameInfo}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BrutalistText size={14} bold>
+                          <BrutalistText size={10} mono muted>
+                            {getGameType(game.puzzle_id)}
+                          </BrutalistText>
+                          <BrutalistText size={10} mono muted>•</BrutalistText>
+                          <BrutalistText size={12} bold>
                             {DIFFICULTY_LABELS[game.difficulty] || game.difficulty}
                           </BrutalistText>
                           <View style={[styles.gridTypeBadge, { borderColor: colors.muted }]}>
@@ -371,19 +393,21 @@ export default function BoardScreen() {
                             </BrutalistText>
                           </View>
                         </View>
-                        <BrutalistText size={10} mono muted>
-                          {formatDate(game.completed_at)}
-                        </BrutalistText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <BrutalistText size={10} mono muted>
+                            {formatDate(game.completed_at)}
+                          </BrutalistText>
+                          {(game.mistakes || 0) > 0 && (
+                            <BrutalistText size={10} mono color={colors.mistake}>
+                              {game.mistakes} mistake{game.mistakes !== 1 ? 's' : ''}
+                            </BrutalistText>
+                          )}
+                        </View>
                       </View>
                       <View style={styles.recentGameStats}>
                         <BrutalistText size={14} mono bold>
                           {formatTime(game.time_seconds)}
                         </BrutalistText>
-                        {(game.mistakes || 0) > 0 && (
-                          <BrutalistText size={10} mono color={colors.mistake}>
-                            {game.mistakes} mistake{game.mistakes !== 1 ? 's' : ''}
-                          </BrutalistText>
-                        )}
                       </View>
                       <View
                         style={[
@@ -391,8 +415,8 @@ export default function BoardScreen() {
                           { backgroundColor: game.completed ? colors.success : colors.muted },
                         ]}
                       >
-                        <BrutalistText size={8} mono bold color={colors.background}>
-                          {game.completed ? 'WIN' : 'DNF'}
+                        <BrutalistText size={10} mono bold color={colors.background}>
+                          {game.completed ? `+${calculateGamePoints(game)}` : 'DNF'}
                         </BrutalistText>
                       </View>
                     </View>

@@ -17,8 +17,9 @@ import { HeatmapCalendar, generateHeatmapData } from '../src/components/HeatmapC
 import { SolveTimeTrends, calculateSolveTimeTrends } from '../src/components/SolveTimeTrends';
 import { useTheme } from '../src/context/ThemeContext';
 import { statsService } from '../src/services/statsService';
+import { getPointInfoForDifficulty } from '../src/services/pointService';
 import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
-import type { UserStats, GameSession } from '../src/lib/database.types';
+import type { UserStats, GameSession, Difficulty, GridType } from '../src/lib/database.types';
 
 const formatTime = (seconds: number): string => {
   if (!seconds) return '--:--';
@@ -42,6 +43,23 @@ const DIFFICULTY_LABELS: Record<string, string> = {
   extreme: 'Extreme',
   insane: 'Insane',
   inhuman: 'Inhuman',
+};
+
+const getGameType = (puzzleId: string): string => {
+  if (puzzleId.startsWith('daily-')) return 'Daily';
+  if (puzzleId.startsWith('chapter-')) return 'Chapter';
+  return 'Free Run';
+};
+
+const calculateGamePoints = (game: GameSession): number => {
+  if (!game.completed) return 0;
+  const info = getPointInfoForDifficulty(
+    game.difficulty as Difficulty,
+    (game.grid_type || '9x9') as GridType
+  );
+  const mistakePenalty = (game.mistakes || 0) * Math.abs(info.mistakePenalty);
+  const helperPenalty = (game.hints_used || 0) * Math.abs(info.helperPenalty);
+  return Math.max(0, info.gamePoints - mistakePenalty - helperPenalty);
 };
 
 export default function StatsScreen() {
@@ -247,22 +265,35 @@ export default function StatsScreen() {
                     ]}
                   >
                     <View style={styles.recentGameInfo}>
-                      <BrutalistText size={14} bold>
-                        {DIFFICULTY_LABELS[game.difficulty] || game.difficulty}
-                      </BrutalistText>
-                      <BrutalistText size={10} mono muted>
-                        {formatDate(game.completed_at)}
-                      </BrutalistText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <BrutalistText size={10} mono muted>
+                          {getGameType(game.puzzle_id)}
+                        </BrutalistText>
+                        <BrutalistText size={10} mono muted>•</BrutalistText>
+                        <BrutalistText size={12} bold>
+                          {DIFFICULTY_LABELS[game.difficulty] || game.difficulty}
+                        </BrutalistText>
+                        <View style={[styles.gridTypeBadge, { borderColor: colors.muted }]}>
+                          <BrutalistText size={9} mono muted>
+                            {game.grid_type || '9x9'}
+                          </BrutalistText>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <BrutalistText size={10} mono muted>
+                          {formatDate(game.completed_at)}
+                        </BrutalistText>
+                        {(game.mistakes || 0) > 0 && (
+                          <BrutalistText size={10} mono color={colors.mistake}>
+                            {game.mistakes} mistake{game.mistakes !== 1 ? 's' : ''}
+                          </BrutalistText>
+                        )}
+                      </View>
                     </View>
                     <View style={styles.recentGameStats}>
                       <BrutalistText size={14} mono bold>
                         {formatTime(game.time_seconds)}
                       </BrutalistText>
-                      {(game.mistakes || 0) > 0 && (
-                        <BrutalistText size={10} mono color={colors.mistake}>
-                          {game.mistakes} mistake{game.mistakes !== 1 ? 's' : ''}
-                        </BrutalistText>
-                      )}
                     </View>
                     <View
                       style={[
@@ -270,8 +301,8 @@ export default function StatsScreen() {
                         { backgroundColor: game.completed ? colors.success : colors.muted },
                       ]}
                     >
-                      <BrutalistText size={8} mono bold color={colors.background}>
-                        {game.completed ? 'WIN' : 'DNF'}
+                      <BrutalistText size={10} mono bold color={colors.background}>
+                        {game.completed ? `+${calculateGamePoints(game)}` : 'DNF'}
                       </BrutalistText>
                     </View>
                   </View>
@@ -353,5 +384,10 @@ const styles = StyleSheet.create({
   completedBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  gridTypeBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
 });
