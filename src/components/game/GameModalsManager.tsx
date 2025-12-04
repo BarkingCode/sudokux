@@ -8,6 +8,7 @@ import { DailyCompletionModal } from '../DailyCompletionModal';
 import { ChapterCompletionModal } from '../ChapterCompletionModal';
 import { FreeRunCompletionModal } from '../FreeRunCompletionModal';
 import { SmartHintModal } from '../SmartHintModal';
+import { PointSystemModal } from '../PointSystemModal';
 import type { SmartHint } from '../../game/hintAnalyzer';
 import type { Difficulty, GridType } from '../../context/GameContext';
 import type { DailyChallenge } from '../../services/dailyChallengeService';
@@ -49,12 +50,17 @@ interface GameModalsManagerProps {
   showChapterModal: boolean;
   showFreeRunModal: boolean;
   showHintModal: boolean;
+  showPointSystemModal: boolean;
 
   // Modal close handlers
   onCloseDailyModal: () => void;
   onCloseChapterModal: () => void;
   onCloseFreeRunModal: () => void;
   onCloseHintModal: () => void;
+  onClosePointSystemModal: () => void;
+
+  // Current grid type for point system modal
+  gridType: GridType;
 
   // Hint
   currentHint: SmartHint | null;
@@ -74,10 +80,13 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
   showChapterModal,
   showFreeRunModal,
   showHintModal,
+  showPointSystemModal,
   onCloseDailyModal,
   onCloseChapterModal,
   onCloseFreeRunModal,
   onCloseHintModal,
+  onClosePointSystemModal,
+  gridType,
   currentHint,
   onApplyHint,
   dailyProps,
@@ -133,6 +142,13 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
         hint={currentHint}
         onClose={onCloseHintModal}
         onApplyHint={onApplyHint}
+      />
+
+      {/* Point System Modal */}
+      <PointSystemModal
+        visible={showPointSystemModal}
+        onClose={onClosePointSystemModal}
+        currentGridType={gridType}
       />
     </>
   );

@@ -31,6 +31,60 @@ export const DIFFICULTY_POINTS_6X6: Record<Difficulty, number> = {
   inhuman: 250,
 };
 
+// Mistake penalties per difficulty (currently 0 - no penalty for mistakes)
+export const MISTAKE_PENALTIES: Record<Difficulty, number> = {
+  easy: 0,
+  medium: 0,
+  hard: 0,
+  extreme: 0,
+  insane: 0,
+  inhuman: 0,
+};
+
+// Helper penalties per difficulty (points deducted when using helper)
+export const HELPER_PENALTIES: Record<Difficulty, number> = {
+  easy: -1,
+  medium: -5,
+  hard: -10,
+  extreme: -15,
+  insane: -25,
+  inhuman: -50,
+};
+
+// Helper penalties for 6x6 grids (half of 9x9)
+export const HELPER_PENALTIES_6X6: Record<Difficulty, number> = {
+  easy: -1,
+  medium: -2,
+  hard: -5,
+  extreme: -8,
+  insane: -12,
+  inhuman: -25,
+};
+
+/**
+ * Point information for a specific difficulty and grid type
+ */
+export interface PointInfo {
+  gamePoints: number;
+  mistakePenalty: number;
+  helperPenalty: number;
+}
+
+/**
+ * Get complete point information for a difficulty and grid type
+ */
+export const getPointInfoForDifficulty = (
+  difficulty: Difficulty,
+  gridType: GridType = '9x9'
+): PointInfo => {
+  const helperPenalties = gridType === '6x6' ? HELPER_PENALTIES_6X6 : HELPER_PENALTIES;
+  return {
+    gamePoints: getPointsForDifficulty(difficulty, gridType),
+    mistakePenalty: MISTAKE_PENALTIES[difficulty],
+    helperPenalty: helperPenalties[difficulty],
+  };
+};
+
 /**
  * Get points for a specific difficulty and grid type
  */

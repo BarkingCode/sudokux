@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
+import { Info } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useGame } from '../context/GameContext';
 import { useAds } from '../context/AdContext';
@@ -454,6 +455,17 @@ export default function GameScreen() {
         </View>
 
         <View style={styles.headerRight}>
+          {!isViewOnly && (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                modals.openPointSystemModal();
+              }}
+              style={styles.infoButton}
+            >
+              <Info size={20} color={colors.primary} strokeWidth={2.5} />
+            </Pressable>
+          )}
           {isViewOnly ? (
             <BrutalistText size={12} mono bold color={colors.success}>
               {formatTime(completionTime)}
@@ -510,10 +522,13 @@ export default function GameScreen() {
         showChapterModal={modals.showChapterModal}
         showFreeRunModal={modals.showFreeRunModal}
         showHintModal={modals.showHintModal}
+        showPointSystemModal={modals.showPointSystemModal}
         onCloseDailyModal={handleDailyModalClose}
         onCloseChapterModal={handleBackToChapters}
         onCloseFreeRunModal={handleBackToFreeRun}
         onCloseHintModal={modals.closeHintModal}
+        onClosePointSystemModal={modals.closePointSystemModal}
+        gridType={gameState.gridType}
         currentHint={modals.currentHint}
         onApplyHint={handleApplyHint}
         dailyProps={{
@@ -595,8 +610,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerRight: {
-    width: 70,
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 90,
+  },
+  infoButton: {
+    padding: 8,
+    marginRight: 8,
   },
   boardContainer: {
     flex: 1,

@@ -11,6 +11,7 @@ export interface GameModalsState {
   showChapterModal: boolean;
   showFreeRunModal: boolean;
   showHintModal: boolean;
+  showPointSystemModal: boolean;
   currentHint: SmartHint | null;
 }
 
@@ -23,6 +24,8 @@ export interface GameModalsActions {
   closeFreeRunModal: () => void;
   openHintModal: (hint: SmartHint) => void;
   closeHintModal: () => void;
+  openPointSystemModal: () => void;
+  closePointSystemModal: () => void;
   resetAllModals: () => void;
 }
 
@@ -38,6 +41,7 @@ export const useGameModals = (): UseGameModalsReturn => {
   const [showChapterModal, setShowChapterModal] = useState(false);
   const [showFreeRunModal, setShowFreeRunModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
+  const [showPointSystemModal, setShowPointSystemModal] = useState(false);
   const [currentHint, setCurrentHint] = useState<SmartHint | null>(null);
 
   // Refs to track if modals have been shown (prevent duplicate shows)
@@ -64,6 +68,9 @@ export const useGameModals = (): UseGameModalsReturn => {
     setShowHintModal(false);
   }, []);
 
+  const openPointSystemModal = useCallback(() => setShowPointSystemModal(true), []);
+  const closePointSystemModal = useCallback(() => setShowPointSystemModal(false), []);
+
   const resetAllModals = useCallback(() => {
     hasShownCompletionAd.current = false;
     hasShownDailyModal.current = false;
@@ -77,6 +84,7 @@ export const useGameModals = (): UseGameModalsReturn => {
     showChapterModal,
     showFreeRunModal,
     showHintModal,
+    showPointSystemModal,
     currentHint,
     // Actions
     openDailyModal,
@@ -87,6 +95,8 @@ export const useGameModals = (): UseGameModalsReturn => {
     closeFreeRunModal,
     openHintModal,
     closeHintModal,
+    openPointSystemModal,
+    closePointSystemModal,
     resetAllModals,
     // Refs
     hasShownDailyModal,
