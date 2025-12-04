@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 import { useAdSession } from '../hooks/useAdSession';
 import { useInterstitialAd } from '../hooks/useInterstitialAd';
 import { useRewardedAd } from '../hooks/useRewardedAd';
+import { useHelperRewardedAd } from '../hooks/useHelperRewardedAd';
 
 interface AdContextType {
   isAdFree: boolean;
@@ -27,6 +28,11 @@ interface AdContextType {
   isAtFreeRunLimit: boolean;
   consumeFreeRunGame: () => boolean;
   showRewardedAd: () => Promise<boolean>;
+
+  // Helper ad (separate from free-run rewards)
+  showHelperRewardedAd: () => Promise<boolean>;
+  isHelperRewardedAdReady: boolean;
+  isLoadingHelperAd: boolean;
 
   // Ad loading state
   isInterstitialAdReady: boolean;
@@ -60,6 +66,9 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [addFreeRunGames]);
 
   const rewardedAd = useRewardedAd({ isAdFree, onRewardEarned: handleRewardEarned });
+
+  // Helper rewarded ad (for Smart Helper) - does NOT grant free games
+  const helperRewardedAd = useHelperRewardedAd({ isAdFree });
 
   // Called when Chapter puzzle is completed - may show interstitial
   const onChapterComplete = useCallback(async (): Promise<void> => {
@@ -105,6 +114,11 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         isAtFreeRunLimit: !isAdFree && isAtFreeRunLimit,
         consumeFreeRunGame,
         showRewardedAd: rewardedAd.show,
+        // Helper ad (separate from free-run rewards)
+        showHelperRewardedAd: helperRewardedAd.show,
+        isHelperRewardedAdReady: helperRewardedAd.isReady,
+        isLoadingHelperAd: helperRewardedAd.isLoading,
+        // General ad state
         isInterstitialAdReady: interstitialAd.isReady,
         isRewardedAdReady: rewardedAd.isReady,
         isLoadingAd: rewardedAd.isLoading,

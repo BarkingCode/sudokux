@@ -22,13 +22,14 @@ export const HelperAdModal: React.FC<HelperAdModalProps> = ({
   onUnlocked,
 }) => {
   const { colors } = useTheme();
-  const { showRewardedAd, isRewardedAdReady, isLoadingAd } = useAds();
+  // Use helper-specific ad (does NOT grant free-run games)
+  const { showHelperRewardedAd, isHelperRewardedAdReady, isLoadingHelperAd } = useAds();
   const [isWatching, setIsWatching] = useState(false);
 
   const handleWatchAd = async () => {
     setIsWatching(true);
     try {
-      const success = await showRewardedAd();
+      const success = await showHelperRewardedAd();
       if (success) {
         onUnlocked();
       }
@@ -68,7 +69,7 @@ export const HelperAdModal: React.FC<HelperAdModalProps> = ({
 
           {/* Actions */}
           <View style={styles.actions}>
-            {isWatching || isLoadingAd ? (
+            {isWatching || isLoadingHelperAd ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <BrutalistText size={12} mono muted style={styles.loadingText}>
@@ -82,10 +83,10 @@ export const HelperAdModal: React.FC<HelperAdModalProps> = ({
                   onPress={handleWatchAd}
                   variant="primary"
                   size="large"
-                  disabled={!isRewardedAdReady && !__DEV__}
+                  disabled={!isHelperRewardedAdReady && !__DEV__}
                   style={styles.watchButton}
                 />
-                {!isRewardedAdReady && (
+                {!isHelperRewardedAdReady && (
                   <BrutalistText size={10} mono muted style={styles.hint}>
                     Ad loading...
                   </BrutalistText>

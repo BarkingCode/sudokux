@@ -44,6 +44,10 @@ const PRODUCTION_AD_UNIT_IDS = {
     ios: process.env.EXPO_PUBLIC_ADMOB_REWARDED_IOS,
     android: process.env.EXPO_PUBLIC_ADMOB_REWARDED_ANDROID,
   }) as string,
+  HELPER_REWARDED: Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_HELPER_REWARDED_IOS,
+    android: process.env.EXPO_PUBLIC_ADMOB_HELPER_REWARDED_ANDROID,
+  }) as string,
 };
 
 // Use test IDs in development, production IDs in release builds
@@ -52,5 +56,6 @@ export const AD_UNIT_IDS = __DEV__
       BANNER: TestIds.BANNER,
       INTERSTITIAL: TestIds.INTERSTITIAL,
       REWARDED: TestIds.REWARDED,
+      HELPER_REWARDED: TestIds.REWARDED, // Use test rewarded ad for helper in dev
     }
   : PRODUCTION_AD_UNIT_IDS;
