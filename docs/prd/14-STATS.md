@@ -24,16 +24,18 @@ Tracked in `user_stats` table:
 
 ## Points System
 
-### Base Points by Difficulty
+### Base Points by Difficulty and Grid Type
 
-| Difficulty | Base Points |
-|------------|-------------|
-| Easy       | 10          |
-| Medium     | 25          |
-| Hard       | 50          |
-| Extreme    | 100         |
-| Insane     | 200         |
-| Inhuman    | 500         |
+6×6 puzzles award **half the points** of 9×9 puzzles:
+
+| Difficulty | 9×9 Points | 6×6 Points |
+|------------|------------|------------|
+| Easy       | 10         | 5          |
+| Medium     | 25         | 12         |
+| Hard       | 50         | 25         |
+| Extreme    | 100        | 50         |
+| Insane     | 200        | 100        |
+| Inhuman    | 500        | 250        |
 
 ### Deductions
 
@@ -82,7 +84,8 @@ total_points = SUM(points_per_game) across all completed games
 
 ### Recent Games
 - Last 10 completed games
-- Shows difficulty, time, mistakes
+- Shows difficulty, grid type (6×6/9×9), time, mistakes
+- Grid type displayed as badge next to difficulty label
 - Pulled from all three sources
 
 ## Local Stats (AsyncStorage)

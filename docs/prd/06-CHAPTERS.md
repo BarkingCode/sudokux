@@ -6,18 +6,34 @@ Chapters is the primary single-player progression mode. Players complete puzzles
 
 ## Puzzle Progression
 
-Puzzles are organized by difficulty tiers:
+Puzzles are organized by difficulty tiers (30 puzzles per difficulty):
 
 | Puzzle Range | Difficulty |
 |--------------|------------|
-| 1-20         | Easy       |
-| 21-40        | Medium     |
-| 41-60        | Hard       |
-| 61-80        | Extreme    |
-| 81-100       | Insane     |
-| 101+         | Inhuman    |
+| 1-30         | Easy       |
+| 31-60        | Medium     |
+| 61-90        | Hard       |
+| 91-120       | Extreme    |
+| 121-150      | Insane     |
+| 151+         | Inhuman    |
 
 Players must complete puzzles sequentially - cannot skip to puzzle 6 without completing puzzle 5.
+
+## Grid Type Selection
+
+Players can choose between two separate chapter paths:
+
+| Grid Type | Description |
+|-----------|-------------|
+| 9×9       | Standard Sudoku (default) |
+| 6×6       | Mini Sudoku |
+
+**Key Features:**
+- Toggle at top of chapter screen to switch between 9×9 and 6×6
+- Each grid type maintains **separate progress** (completing 9×9 puzzles doesn't affect 6×6 progress)
+- Selected grid type persisted in AsyncStorage (`CHAPTER_GRID_TYPE`)
+- 6×6 progress stored separately (`CHAPTER_PROGRESS_6X6`)
+- Database `chapter_completions` table includes `grid_type` column for tracking
 
 ## Deterministic Puzzle Generation
 
