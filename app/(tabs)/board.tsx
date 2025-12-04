@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, Info } from 'lucide-react-native';
 import { BrutalistText } from '../../src/components/BrutalistText';
 import { AchievementBadge } from '../../src/components/AchievementBadge';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -24,6 +24,7 @@ import { StatCard } from '../../src/components/StatCard';
 import { WeeklyChart, generateWeeklyData } from '../../src/components/WeeklyChart';
 import { HeatmapCalendar, generateHeatmapData } from '../../src/components/HeatmapCalendar';
 import { SolveTimeTrends, calculateSolveTimeTrends } from '../../src/components/SolveTimeTrends';
+import { PointSystemModal } from '../../src/components/PointSystemModal';
 import { useTheme } from '../../src/context/ThemeContext';
 import { statsService } from '../../src/services/statsService';
 import { pointService, type PointsLeaderboardEntry, type UserPointsRank } from '../../src/services/pointService';
@@ -63,7 +64,7 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-export default function ProfileScreen() {
+export default function BoardScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
@@ -88,6 +89,9 @@ export default function ProfileScreen() {
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Point System Modal state
+  const [showPointSystemModal, setShowPointSystemModal] = useState(false);
 
   const loadProfile = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
@@ -166,6 +170,11 @@ export default function ProfileScreen() {
     router.push('/leaderboards');
   }, [router]);
 
+  const handleOpenPointSystem = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowPointSystemModal(true);
+  }, []);
+
   const winRate = stats
     ? Math.round(((stats.total_wins || 0) / Math.max(stats.total_games || 1, 1)) * 100)
     : 0;
@@ -203,12 +212,20 @@ export default function ProfileScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
-          <BrutalistText size={11} mono uppercase muted>
-            Your Progress
-          </BrutalistText>
-          <BrutalistText size={36} bold uppercase letterSpacing={2}>
-            BOARD
-          </BrutalistText>
+          <View style={styles.headerTop}>
+            <View style={styles.headerSpacer} />
+            <View style={styles.headerTitleContainer}>
+              <BrutalistText size={11} mono uppercase muted>
+                Your Progress
+              </BrutalistText>
+              <BrutalistText size={36} bold uppercase letterSpacing={2}>
+                BOARD
+              </BrutalistText>
+            </View>
+            <Pressable onPress={handleOpenPointSystem} style={styles.infoButton}>
+              <Info size={22} color={colors.primary} strokeWidth={2.5} />
+            </Pressable>
+          </View>
           <View style={[styles.headerLine, { backgroundColor: colors.primary }]} />
         </Animated.View>
 
@@ -401,6 +418,13 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Point System Modal */}
+      <PointSystemModal
+        visible={showPointSystemModal}
+        onClose={() => setShowPointSystemModal(false)}
+        currentGridType="9x9"
+      />
     </SafeAreaView>
   );
 }
@@ -424,6 +448,25 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 24,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  infoButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerLine: {
     width: 60,
