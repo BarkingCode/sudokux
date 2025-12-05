@@ -20,6 +20,8 @@ import {
 } from '../services/dailyChallengeService';
 import { badgeService } from '../services/badgeService';
 import { checkAchievements } from '../services/achievementService';
+import { logDailyChallengeCompleted, logGameCompleted } from '../services/facebookAnalytics';
+import { maybeRequestReview } from '../services/storeReviewService';
 import type { Difficulty } from '../lib/database.types';
 
 interface DailyCompletionModalProps {
@@ -31,6 +33,7 @@ interface DailyCompletionModalProps {
   timeSeconds: number;
   mistakes: number;
   helperUsed: number;
+  onClearProgress?: () => Promise<void>;
 }
 
 const formatTime = (seconds: number): string => {
@@ -58,6 +61,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
   timeSeconds,
   mistakes,
   helperUsed,
+  onClearProgress,
 }) => {
   const { colors } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +109,13 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
       );
 
       if (result.success) {
+        // Clear saved daily progress since we completed successfully
+        try {
+          await onClearProgress?.();
+        } catch (e) {
+          console.log('Clear progress error:', e);
+        }
+
         // Clear app badge on successful completion
         try {
           await badgeService.onDailyCompleted();
@@ -126,6 +137,13 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
           // Achievement check failure is non-critical
           console.log('Achievement check error:', e);
         }
+
+        // Log Facebook analytics events
+        logDailyChallengeCompleted(difficulty, timeSeconds);
+        logGameCompleted(difficulty);
+
+        // Request store review after successful completion
+        maybeRequestReview();
       } else if (result.error && !result.error.includes('Already completed')) {
         // Only show error if it's not "already completed"
         setSubmitError(result.error);
@@ -164,7 +182,7 @@ export const DailyCompletionModal: React.FC<DailyCompletionModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [userId, challenge, difficulty, timeSeconds, mistakes, helperUsed]);
+  }, [userId, challenge, difficulty, timeSeconds, mistakes, helperUsed, onClearProgress]);
 
   const handleRetry = useCallback(() => {
     setHasSubmitted(false);

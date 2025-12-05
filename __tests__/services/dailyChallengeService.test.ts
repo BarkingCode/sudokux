@@ -127,7 +127,8 @@ describe('dailyChallengeService', () => {
       const challenge = await getTodayChallenge();
 
       expect(challenge).not.toBeNull();
-      expect(challenge!.id).toContain('fallback');
+      // Fallback ID is a deterministic UUID, check it's a valid UUID format
+      expect(challenge!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(challenge!.grid_type).toBe('9x9'); // Daily is always 9x9
     });
 
@@ -137,7 +138,8 @@ describe('dailyChallengeService', () => {
       const challenge = await getTodayChallenge();
 
       expect(challenge).not.toBeNull();
-      expect(challenge!.id).toContain('fallback');
+      // Fallback ID is a deterministic UUID, check it's a valid UUID format
+      expect(challenge!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     });
 
     it('should return valid puzzle grid in fallback', async () => {

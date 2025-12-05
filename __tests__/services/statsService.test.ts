@@ -300,7 +300,7 @@ describe('statsService', () => {
 
       const result = await statsService.getDifficultyWins('user-123');
 
-      expect(result).toEqual({ easy: 0, medium: 0, hard: 0 });
+      expect(result).toEqual({ easy: 0, medium: 0, hard: 0, extreme: 0, insane: 0, inhuman: 0 });
     });
   });
 

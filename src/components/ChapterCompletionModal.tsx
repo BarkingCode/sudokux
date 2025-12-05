@@ -3,7 +3,7 @@
  * Shows time, mistakes, and option to continue to next puzzle.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
 import { Trophy } from 'lucide-react-native';
@@ -11,6 +11,7 @@ import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
 import { useTheme } from '../context/ThemeContext';
 import { Difficulty } from '../context/GameContext';
+import { maybeRequestReview } from '../services/storeReviewService';
 
 interface ChapterCompletionModalProps {
   visible: boolean;
@@ -52,6 +53,13 @@ export const ChapterCompletionModal: React.FC<ChapterCompletionModalProps> = ({
   mistakes,
 }) => {
   const { colors } = useTheme();
+
+  // Request store review after game completion
+  useEffect(() => {
+    if (visible) {
+      maybeRequestReview();
+    }
+  }, [visible]);
 
   const getPerfectBonus = () => {
     if (mistakes === 0) return 'Perfect!';

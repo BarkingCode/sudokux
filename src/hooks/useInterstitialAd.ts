@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 import { AD_UNIT_IDS } from '../config/ads';
+import { logAdImpression } from '../services/facebookAnalytics';
 
 // Create ad instance at module level
 const interstitialAd = InterstitialAd.createForAdRequest(AD_UNIT_IDS.INTERSTITIAL);
@@ -51,6 +52,14 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
       }
     );
 
+    const openedUnsub = interstitialAd.addAdEventListener(
+      AdEventType.OPENED,
+      () => {
+        console.log('[useInterstitialAd] Ad opened - logging impression');
+        logAdImpression('interstitial');
+      }
+    );
+
     const closedUnsub = interstitialAd.addAdEventListener(
       AdEventType.CLOSED,
       () => {
@@ -73,6 +82,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
 
     return () => {
       loadedUnsub();
+      openedUnsub();
       closedUnsub();
       errorUnsub();
     };

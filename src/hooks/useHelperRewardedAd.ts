@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { RewardedAd, AdEventType, RewardedAdEventType } from 'react-native-google-mobile-ads';
 import { AD_UNIT_IDS } from '../config/ads';
+import { logAdImpression } from '../services/facebookAnalytics';
 
 // Create ad instance at module level - separate from main rewarded ad
 const helperRewardedAd = RewardedAd.createForAdRequest(AD_UNIT_IDS.HELPER_REWARDED);
@@ -57,6 +58,14 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
       }
     );
 
+    const openedUnsub = helperRewardedAd.addAdEventListener(
+      AdEventType.OPENED,
+      () => {
+        console.log('[useHelperRewardedAd] Ad opened - logging impression');
+        logAdImpression('rewarded_helper');
+      }
+    );
+
     const earnedUnsub = helperRewardedAd.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       () => {
@@ -89,6 +98,7 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
 
     return () => {
       loadedUnsub();
+      openedUnsub();
       earnedUnsub();
       closedUnsub();
       errorUnsub();

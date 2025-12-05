@@ -19,6 +19,7 @@ interface DailyModalProps {
   timeSeconds: number;
   mistakes: number;
   helperUsed: number;
+  onClearProgress?: () => Promise<void>;
 }
 
 interface ChapterModalProps {
@@ -103,6 +104,7 @@ export const GameModalsManager: React.FC<GameModalsManagerProps> = ({
           timeSeconds={dailyProps.timeSeconds}
           mistakes={dailyProps.mistakes}
           helperUsed={dailyProps.helperUsed}
+          onClearProgress={dailyProps.onClearProgress}
         />
       )}
 

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
   difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
   time_seconds INTEGER NOT NULL CHECK (time_seconds >= 0),
   mistakes INTEGER DEFAULT 0 CHECK (mistakes >= 0),
-  hints_used INTEGER DEFAULT 0 CHECK (hints_used >= 0),
+  helper_used INTEGER DEFAULT 0 CHECK (helper_used >= 0),
   completed BOOLEAN DEFAULT TRUE,
   completed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
@@ -155,12 +155,12 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- Insert or update user stats
   INSERT INTO public.user_stats (user_id, total_games, total_wins, total_mistakes, total_hints)
-  VALUES (NEW.user_id, 1, CASE WHEN NEW.completed THEN 1 ELSE 0 END, NEW.mistakes, NEW.hints_used)
+  VALUES (NEW.user_id, 1, CASE WHEN NEW.completed THEN 1 ELSE 0 END, NEW.mistakes, NEW.helper_used)
   ON CONFLICT (user_id) DO UPDATE SET
     total_games = user_stats.total_games + 1,
     total_wins = user_stats.total_wins + CASE WHEN NEW.completed THEN 1 ELSE 0 END,
     total_mistakes = user_stats.total_mistakes + NEW.mistakes,
-    total_hints = user_stats.total_hints + NEW.hints_used,
+    total_hints = user_stats.total_hints + NEW.helper_used,
     -- Update best times
     best_time_easy = CASE
       WHEN NEW.difficulty = 'easy' AND NEW.completed AND (user_stats.best_time_easy IS NULL OR NEW.time_seconds < user_stats.best_time_easy)
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS public.chapter_completions (
   solution_grid TEXT NOT NULL, -- JSON string of 2D array representing the solution
   time_seconds INTEGER NOT NULL CHECK (time_seconds >= 0),
   mistakes INTEGER DEFAULT 0 CHECK (mistakes >= 0),
-  hints_used INTEGER DEFAULT 0 CHECK (hints_used >= 0),
+  helper_used INTEGER DEFAULT 0 CHECK (helper_used >= 0),
   completed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   UNIQUE(user_id, puzzle_number) -- One completion per puzzle per user
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS public.daily_completions (
   challenge_date DATE NOT NULL,
   time_seconds INTEGER NOT NULL CHECK (time_seconds >= 0),
   mistakes INTEGER DEFAULT 0 CHECK (mistakes >= 0),
-  hints_used INTEGER DEFAULT 0 CHECK (hints_used >= 0),
+  helper_used INTEGER DEFAULT 0 CHECK (helper_used >= 0),
   completed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   UNIQUE(user_id, challenge_date) -- One completion per day per user
 );

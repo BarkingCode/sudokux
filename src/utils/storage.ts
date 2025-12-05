@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   CHAPTER_PROGRESS_6X6: 'sudoku_chapter_progress_6x6', // 6x6 chapter progress
   CHAPTER_IN_PROGRESS: 'sudoku_chapter_in_progress', // Single active chapter game progress
   CHAPTER_GRID_TYPE: 'sudoku_chapter_grid_type', // Selected grid type for chapters
+  GAME_COMPLETION_COUNT: 'sudoku_game_completion_count', // For store review triggering
+  HAS_REVIEWED_APP: 'sudoku_has_reviewed_app', // Track if user has seen review prompt
 };
 
 /**

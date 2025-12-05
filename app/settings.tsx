@@ -10,6 +10,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import * as Application from 'expo-application';
 import { X, Check, Pencil } from 'lucide-react-native';
 import { BrutalistText } from '../src/components/BrutalistText';
 import { useTheme } from '../src/context/ThemeContext';
@@ -373,7 +374,7 @@ export default function SettingsScreen() {
                 Version
               </BrutalistText>
               <BrutalistText size={14} mono bold>
-                1.0.0
+                {Application.nativeApplicationVersion || '1.0.0'}
               </BrutalistText>
             </View>
             <View style={[styles.infoRow, { borderTopWidth: 1, borderTopColor: colors.highlight }]}>

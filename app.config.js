@@ -3,7 +3,7 @@ export default {
     name: 'X-Sudoku',
     slug: 'sudokux',
     scheme: 'sudokux',
-    version: '1.0.2',
+    version: '1.0.3',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -33,6 +33,8 @@ export default {
           { SKAdNetworkIdentifier: 'c6k4g5qg8m.skadnetwork' },
           { SKAdNetworkIdentifier: 's39g8k73mm.skadnetwork' },
           { SKAdNetworkIdentifier: '3qy4746246.skadnetwork' },
+          { SKAdNetworkIdentifier: 'v9wttpbfk9.skadnetwork' }, // Facebook
+          { SKAdNetworkIdentifier: 'n38lu8286q.skadnetwork' }, // Facebook
         ],
         NSUserTrackingUsageDescription:
           'This identifier will be used to deliver personalized ads to you.',
@@ -93,6 +95,18 @@ export default {
         },
       ],
       'expo-localization',
+      [
+        'react-native-fbsdk-next',
+        {
+          appID: '1186243443458880',
+          displayName: 'X-Sudoku',
+          clientToken: process.env.EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN',
+          advertiserIDCollectionEnabled: true,
+          autoLogAppEventsEnabled: true,
+          isAutoInitEnabled: true,
+        },
+      ],
+      'expo-tracking-transparency',
     ],
     extra: {
       router: {},

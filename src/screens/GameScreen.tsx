@@ -9,9 +9,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
+import { activateKeepAwakeAsync, deactivateKeepAwakeAsync } from 'expo-keep-awake';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
-import { Info } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useGame } from '../context/GameContext';
 import { useAds } from '../context/AdContext';
@@ -20,6 +20,7 @@ import { chapterService } from '../services/chapterService';
 import { getChapterPuzzle } from '../game/chapterPuzzles';
 import { statsService } from '../services/statsService';
 import { checkAchievements, onChapterComplete } from '../services/achievementService';
+import { logGameCompleted, logChapterCompleted } from '../services/facebookAnalytics';
 import type { DailyChallenge } from '../services/dailyChallengeService';
 import { BrutalistText } from '../components/BrutalistText';
 import { SudokuBoard } from '../components/board/SudokuBoard';
@@ -59,9 +60,12 @@ export default function GameScreen() {
     pauseGame,
     resumeGame,
     unlockHelper,
+    toggleHelper,
     devAutoComplete,
     saveChapterProgress,
     clearChapterProgress,
+    saveDailyProgress,
+    clearDailyProgress,
     incrementMistakes,
   } = useGame();
   const { onChapterComplete: showChapterAd, isAdFree } = useAds();
@@ -146,8 +150,12 @@ export default function GameScreen() {
         if (isFreeRun && currentGameState && !currentGameState.isComplete && !isViewOnly) {
           saveData(STORAGE_KEYS.FREERUN_GAME_STATE, currentGameState);
         }
+        // Save Daily progress when leaving screen
+        if (isDaily && currentGameState && !currentGameState.isComplete && !isViewOnly) {
+          saveDailyProgress(challengeDate, challengeId);
+        }
       };
-    }, [pauseGame, resumeGame, isChapter, isFreeRun, isViewOnly, puzzleNumber, saveChapterProgress])
+    }, [pauseGame, resumeGame, isChapter, isFreeRun, isDaily, isViewOnly, puzzleNumber, saveChapterProgress, saveDailyProgress, challengeDate, challengeId])
   );
 
   // Pause/resume timer when app goes to background/foreground
@@ -163,6 +171,18 @@ export default function GameScreen() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
   }, [pauseGame, resumeGame]);
+
+  // Keep screen awake during active gameplay
+  useEffect(() => {
+    if (gameState && !gameState.isComplete && !gameState.isPaused && !isViewOnly) {
+      activateKeepAwakeAsync();
+    } else {
+      deactivateKeepAwakeAsync();
+    }
+    return () => {
+      deactivateKeepAwakeAsync();
+    };
+  }, [gameState?.isComplete, gameState?.isPaused, isViewOnly]);
 
   // Cell press handler
   const handleCellPress = useCallback((row: number, col: number) => {
@@ -188,10 +208,17 @@ export default function GameScreen() {
           }
         }
       } else {
-        if (num !== 0 && gameState.solution[row][col] !== num) {
-          incrementMistakes();
+        const currentValue = gameState.grid[row][col];
+
+        // If tapping the same number that's already in the cell, clear it
+        if (currentValue === num) {
+          updateCell(row, col, 0);
+        } else {
+          if (num !== 0 && gameState.solution[row][col] !== num) {
+            incrementMistakes();
+          }
+          updateCell(row, col, num);
         }
-        updateCell(row, col, num);
       }
     }
   }, [selectedCell, gameState, updateCell, addNote, removeNote, notesMode, incrementMistakes]);
@@ -210,13 +237,18 @@ export default function GameScreen() {
     setNotesMode((prev) => !prev);
   }, []);
 
-  // Toggle helper handler - shows ad modal if not unlocked
+  // Toggle helper handler - shows ad modal if not unlocked, toggles if unlocked
   const handleToggleHelper = useCallback(() => {
     if (!gameState) return;
-    if (gameState.isHelperUnlocked) return; // Already unlocked
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowHelperAdModal(true);
-  }, [gameState?.isHelperUnlocked]);
+    if (!gameState.isHelperUnlocked) {
+      // Not unlocked yet - show ad modal to unlock
+      setShowHelperAdModal(true);
+    } else {
+      // Already unlocked - toggle on/off
+      toggleHelper();
+    }
+  }, [gameState?.isHelperUnlocked, toggleHelper]);
 
   // Handle helper unlock after watching ad
   const handleHelperUnlocked = useCallback(() => {
@@ -251,6 +283,11 @@ export default function GameScreen() {
         // Also unlock the chapter_complete achievement
         await onChapterComplete(supabaseUserId);
       }
+
+      // Log Facebook analytics events
+      logGameCompleted(gameState.difficulty);
+      logChapterCompleted(puzzleNumber, 3); // Assuming 3 stars max for now
+
       console.log('[GameScreen] Saved chapter completion and checked achievements');
     } catch (error) {
       console.error('[GameScreen] Failed to save chapter completion:', error);
@@ -259,7 +296,15 @@ export default function GameScreen() {
 
   // Save free run completion to game_sessions table
   const saveFreeRunCompletion = useCallback(async () => {
-    if (!isFreeRun || !gameState || !supabaseUserId || !gameState.isComplete) return;
+    if (!isFreeRun || !gameState || !gameState.isComplete) return;
+
+    if (!supabaseUserId) {
+      console.warn('[GameScreen] Cannot save free run: supabaseUserId not available', {
+        gridType: gameState.gridType,
+        difficulty: gameState.difficulty,
+      });
+      return;
+    }
 
     try {
       await statsService.recordGame(supabaseUserId, {
@@ -279,7 +324,14 @@ export default function GameScreen() {
         mistakes: gameState.mistakes,
         helperUsed: gameState.helperUsed || 0,
       });
-      console.log('[GameScreen] Saved free run completion and checked achievements');
+
+      // Log Facebook analytics event
+      logGameCompleted(gameState.difficulty);
+
+      console.log('[GameScreen] Saved free run completion and checked achievements', {
+        gridType: gameState.gridType,
+        difficulty: gameState.difficulty,
+      });
     } catch (error) {
       console.error('[GameScreen] Failed to save free run completion:', error);
     }
@@ -452,17 +504,6 @@ export default function GameScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          {!isViewOnly && (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                modals.openPointSystemModal();
-              }}
-              style={styles.infoButton}
-            >
-              <Info size={20} color={colors.primary} strokeWidth={2.5} />
-            </Pressable>
-          )}
           {isViewOnly ? (
             <BrutalistText size={12} mono bold color={colors.success}>
               {formatTime(completionTime)}
@@ -541,6 +582,7 @@ export default function GameScreen() {
           timeSeconds: gameState.timer || 0,
           mistakes: gameState.mistakes,
           helperUsed: gameState.helperUsed || 0,
+          onClearProgress: clearDailyProgress,
         }}
         chapterProps={{
           puzzleNumber,
@@ -610,10 +652,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     minWidth: 90,
-  },
-  infoButton: {
-    padding: 8,
-    marginRight: 8,
   },
   boardContainer: {
     flex: 1,

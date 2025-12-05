@@ -24,6 +24,7 @@ interface NumberPadProps {
   remainingCounts?: Record<number, number>;
   maxNumber?: number; // 6 for 6x6, 9 for 9x9
   validNumbers?: Set<number>; // When provided, only these numbers are valid for selected cell
+  selectedCellValue?: number; // Current value in selected cell (0 if empty)
 }
 
 const { width, height } = Dimensions.get('window');
@@ -41,6 +42,7 @@ interface NumberButtonProps {
   disabled?: boolean;
   remaining?: number;
   isInvalid?: boolean; // True when helper is active and number is not valid for selected cell
+  isSelectedCellValue?: boolean; // True if selected cell contains this number (allow clearing)
   buttonWidth: number;
   buttonHeight: number;
   fontSize?: number;
@@ -52,6 +54,7 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   disabled,
   remaining,
   isInvalid,
+  isSelectedCellValue,
   buttonWidth,
   buttonHeight,
   fontSize = 32,
@@ -59,7 +62,8 @@ const NumberButton: React.FC<NumberButtonProps> = ({
   const { colors } = useTheme();
   const pressed = useSharedValue(0);
   const isComplete = remaining === 0;
-  const isDisabled = disabled || isComplete || isInvalid;
+  // Don't disable if this is the selected cell's value (allow clearing)
+  const isDisabled = disabled || (isComplete && !isSelectedCellValue) || isInvalid;
 
   const handlePressIn = useCallback(() => {
     pressed.value = withSpring(1, { damping: 15, stiffness: 500 });
@@ -128,6 +132,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
   remainingCounts,
   maxNumber = 9,
   validNumbers,
+  selectedCellValue,
 }) => {
   // On iPad: single row for all numbers
   // On iPhone: split into 2 rows (9x9: [1-5], [6-9] | 6x6: [1-3], [4-6])
@@ -171,6 +176,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
             disabled={disabled}
             remaining={remainingCounts?.[num]}
             isInvalid={validNumbers ? !validNumbers.has(num) : false}
+            isSelectedCellValue={selectedCellValue === num}
             buttonWidth={buttonWidth}
             buttonHeight={buttonHeight}
             fontSize={fontSize}
@@ -189,6 +195,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
               disabled={disabled}
               remaining={remainingCounts?.[num]}
               isInvalid={validNumbers ? !validNumbers.has(num) : false}
+              isSelectedCellValue={selectedCellValue === num}
               buttonWidth={buttonWidth}
               buttonHeight={buttonHeight}
               fontSize={fontSize}

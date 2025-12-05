@@ -53,7 +53,7 @@ Points are deducted for mistakes and hints used. The deduction multiplier increa
 ### Formula
 
 ```
-points_per_game = MAX(0, base_points - (mistakes + hints_used) * deduction_multiplier)
+points_per_game = MAX(0, base_points - (mistakes + helper_used) * deduction_multiplier)
 total_points = SUM(points_per_game) across all completed games
 ```
 

@@ -73,11 +73,11 @@ const useValidNumbers = (
 
     const { row, col } = selectedCell;
 
-    // Don't show hints for initial cells (given clues)
-    if (initialGrid[row][col] !== 0) return undefined;
+    // Don't show hints for initial cells (given clues) - return empty set to dim all numbers
+    if (initialGrid[row][col] !== 0) return new Set<number>();
 
-    // Don't show hints for already filled cells
-    if (grid[row][col] !== 0) return undefined;
+    // Don't show hints for already filled cells - return empty set to dim all numbers
+    if (grid[row][col] !== 0) return new Set<number>();
 
     const validSet = new Set<number>();
     for (let num = 1; num <= gridConfig.maxNumber; num++) {
@@ -114,9 +114,15 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
     gameState.grid,
     gameState.initialGrid,
     selectedCell,
-    gameState.isHelperUnlocked,
+    gameState.isHelperActive,
     gridConfig
   );
+
+  // Get the current value in the selected cell (for allowing clearing by tapping same number)
+  const selectedCellValue = useMemo(() => {
+    if (!selectedCell || !gameState.grid) return undefined;
+    return gameState.grid[selectedCell.row][selectedCell.col];
+  }, [selectedCell, gameState.grid]);
 
   const handleCellPress = useCallback((row: number, col: number) => {
     Haptics.selectionAsync();
@@ -140,6 +146,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
           remainingCounts={remainingCounts}
           maxNumber={gridConfig.maxNumber}
           validNumbers={validNumbers}
+          selectedCellValue={selectedCellValue}
         />
       </Animated.View>
 
@@ -171,7 +178,7 @@ export const GamePlayArea: React.FC<GamePlayAreaProps> = ({
           <BrutalistButton
             title="HELPER"
             onPress={onToggleHelper}
-            variant={gameState.isHelperUnlocked ? 'primary' : 'ghost'}
+            variant={gameState.isHelperActive ? 'primary' : 'ghost'}
             size="small"
             style={styles.toolBtn}
           />

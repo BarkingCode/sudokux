@@ -8,6 +8,7 @@ import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
 import { getRandomPuzzle } from '../game/puzzles';
 import { GridType, Difficulty, GRID_CONFIGS } from '../game/types';
 import { isValidMove } from '../game/engine';
+import { logGameStarted } from '../services/facebookAnalytics';
 import type { SmartHint } from '../game/hintAnalyzer';
 import type { ChapterInProgress } from '../services/chapterService';
 
@@ -32,6 +33,7 @@ export interface GameState {
   history: string[];
   conflictCells: string[]; // Array of "row-col" strings
   isHelperUnlocked: boolean; // Smart Possibility Helper unlocked for this game
+  isHelperActive: boolean; // Whether helper is currently toggled on (can only be true if unlocked)
 }
 
 export type { SmartHint } from '../game/hintAnalyzer';
@@ -62,6 +64,24 @@ export interface SavedPuzzleWithProgress extends SavedPuzzleData {
   history?: string[]; // Undo history (optional for backwards compatibility)
 }
 
+export interface DailyInProgress {
+  challengeDate: string;
+  challengeId: string;
+  difficulty: Difficulty;
+  gridType: GridType;
+  initialGrid: number[][];
+  currentGrid: number[][];
+  solution: number[][];
+  timer: number;
+  mistakes: number;
+  helperUsed: number;
+  isHelperUnlocked: boolean;
+  isHelperActive: boolean;
+  notes: Record<string, number[]>;
+  savedAt: string;
+  history?: string[];
+}
+
 interface GameContextType {
   gameState: GameState | null;
   startNewGame: (difficulty: Difficulty, gridType?: GridType) => void;
@@ -76,10 +96,14 @@ interface GameContextType {
   pauseGame: () => void;
   resumeGame: () => void;
   unlockHelper: () => void;
+  toggleHelper: () => void;
   devAutoComplete: () => void;
   saveChapterProgress: (puzzleNumber: number) => Promise<void>;
   loadChapterProgress: () => Promise<ChapterInProgress | null>;
   clearChapterProgress: () => Promise<void>;
+  saveDailyProgress: (challengeDate: string, challengeId: string) => Promise<void>;
+  loadDailyProgress: () => Promise<DailyInProgress | null>;
+  clearDailyProgress: () => Promise<void>;
   incrementMistakes: () => void;
 }
 
@@ -110,6 +134,7 @@ const createInitialState = (gridType: GridType = '9x9'): GameState => ({
   history: [],
   conflictCells: [],
   isHelperUnlocked: false,
+  isHelperActive: false,
 });
 
 /**
@@ -208,6 +233,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isPaused: false,
     };
     setGameState(newState);
+
+    // Log Facebook analytics event
+    logGameStarted(difficulty, gridType);
   }, []);
 
   const loadDailyPuzzle = useCallback((data: DailyPuzzleData) => {
@@ -225,6 +253,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isPaused: false,
     };
     setGameState(newState);
+
+    // Log Facebook analytics event
+    logGameStarted(difficulty, gridType);
   }, []);
 
   /**
@@ -245,6 +276,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isPaused: false,
     };
     setGameState(newState);
+
+    // Log Facebook analytics event
+    logGameStarted(difficulty, gridType);
   }, []);
 
   /**
@@ -311,6 +345,49 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const clearChapterProgress = useCallback(async () => {
     await removeData(STORAGE_KEYS.CHAPTER_IN_PROGRESS);
+  }, []);
+
+  /**
+   * Save current daily progress to storage
+   * Uses ref to access current gameState for stability
+   */
+  const saveDailyProgress = useCallback(async (challengeDate: string, challengeId: string) => {
+    const currentState = gameStateRef.current;
+    if (!currentState || currentState.isComplete) return;
+
+    const inProgress: DailyInProgress = {
+      challengeDate,
+      challengeId,
+      difficulty: currentState.difficulty,
+      gridType: currentState.gridType,
+      initialGrid: currentState.initialGrid,
+      currentGrid: currentState.grid,
+      solution: currentState.solution,
+      timer: currentState.timer,
+      mistakes: currentState.mistakes,
+      helperUsed: currentState.helperUsed,
+      isHelperUnlocked: currentState.isHelperUnlocked,
+      isHelperActive: currentState.isHelperActive,
+      notes: currentState.notes,
+      savedAt: new Date().toISOString(),
+      history: currentState.history,
+    };
+
+    await saveData(STORAGE_KEYS.DAILY_GAME_STATE, inProgress);
+  }, []);
+
+  /**
+   * Load daily progress from storage
+   */
+  const loadDailyProgress = useCallback(async (): Promise<DailyInProgress | null> => {
+    return await loadData<DailyInProgress>(STORAGE_KEYS.DAILY_GAME_STATE);
+  }, []);
+
+  /**
+   * Clear daily progress from storage
+   */
+  const clearDailyProgress = useCallback(async () => {
+    await removeData(STORAGE_KEYS.DAILY_GAME_STATE);
   }, []);
 
   const updateCell = useCallback((row: number, col: number, value: number) => {
@@ -419,13 +496,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Unlock the Smart Possibility Helper for the current game.
    * Called after user watches a rewarded ad.
    * Increments helperUsed by 1 for point penalty calculation.
+   * Also activates helper immediately.
    */
   const unlockHelper = useCallback(() => {
     setGameState(prev => prev ? ({
       ...prev,
       isHelperUnlocked: true,
+      isHelperActive: true,
       helperUsed: prev.helperUsed + 1,
     }) : null);
+  }, []);
+
+  /**
+   * Toggle the Smart Possibility Helper on/off.
+   * Only works if helper has been unlocked for this game.
+   */
+  const toggleHelper = useCallback(() => {
+    setGameState(prev => {
+      if (!prev || !prev.isHelperUnlocked) return prev;
+      return {
+        ...prev,
+        isHelperActive: !prev.isHelperActive,
+      };
+    });
   }, []);
 
   // DEV ONLY: Auto-complete the puzzle with the solution
@@ -469,10 +562,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       pauseGame,
       resumeGame,
       unlockHelper,
+      toggleHelper,
       devAutoComplete,
       saveChapterProgress,
       loadChapterProgress,
       clearChapterProgress,
+      saveDailyProgress,
+      loadDailyProgress,
+      clearDailyProgress,
       incrementMistakes,
     }}>
       {children}

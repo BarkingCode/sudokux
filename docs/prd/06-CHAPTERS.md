@@ -86,7 +86,7 @@ When a puzzle is completed, saved to `chapter_completions` table:
 - `solution_grid` - the solution (JSON)
 - `time_seconds` - completion time
 - `mistakes` - number of mistakes made
-- `hints_used` - number of hints used
+- `helper_used` - number of hints used
 
 ### Mid-Game Progress (AsyncStorage)
 If player leaves a puzzle mid-game:

@@ -17,7 +17,7 @@ import { BannerAd } from '../../src/components/BannerAd';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { StreakDisplay } from '../../src/components/StreakDisplay';
 import { useTheme } from '../../src/context/ThemeContext';
-import { useGame, Difficulty, GridType } from '../../src/context/GameContext';
+import { useGame, Difficulty, GridType, DailyInProgress } from '../../src/context/GameContext';
 import {
   getTodayChallenge,
   getTodayCompletion,
@@ -49,7 +49,7 @@ const formatDate = (dateStr: string): string => {
 export default function DailyScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { loadDailyPuzzle } = useGame();
+  const { loadDailyPuzzle, loadSavedPuzzleWithProgress, loadDailyProgress, clearDailyProgress } = useGame();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -121,17 +121,39 @@ export default function DailyScreen() {
     loadDailyData();
   }, [loadDailyData]);
 
-  const playDailyChallenge = useCallback(() => {
+  const playDailyChallenge = useCallback(async () => {
     if (!challenge) return;
 
-    // Load the pre-generated puzzle from the database
-    loadDailyPuzzle({
-      puzzleId: `daily-${challenge.id}`,
-      difficulty: challenge.difficulty as Difficulty,
-      gridType: challenge.grid_type as GridType,
-      puzzle: challenge.puzzle_grid,
-      solution: challenge.solution_grid,
-    });
+    // Check for saved progress from today
+    const savedProgress = await loadDailyProgress();
+
+    if (savedProgress && savedProgress.challengeDate === challenge.challenge_date) {
+      // Resume saved game with progress
+      loadSavedPuzzleWithProgress({
+        puzzleId: `daily-${challenge.id}`,
+        difficulty: savedProgress.difficulty,
+        gridType: savedProgress.gridType,
+        puzzle: savedProgress.initialGrid,
+        initialGrid: savedProgress.initialGrid,
+        grid: savedProgress.currentGrid,
+        solution: savedProgress.solution,
+        timer: savedProgress.timer,
+        mistakes: savedProgress.mistakes,
+        helperUsed: savedProgress.helperUsed,
+        notes: savedProgress.notes,
+        history: savedProgress.history,
+      });
+    } else {
+      // Clear old progress and start fresh
+      await clearDailyProgress();
+      loadDailyPuzzle({
+        puzzleId: `daily-${challenge.id}`,
+        difficulty: challenge.difficulty as Difficulty,
+        gridType: challenge.grid_type as GridType,
+        puzzle: challenge.puzzle_grid,
+        solution: challenge.solution_grid,
+      });
+    }
 
     router.push({
       pathname: '/game',
@@ -141,7 +163,7 @@ export default function DailyScreen() {
         challengeDate: challenge.challenge_date,
       },
     });
-  }, [challenge, loadDailyPuzzle, router]);
+  }, [challenge, loadDailyPuzzle, loadSavedPuzzleWithProgress, loadDailyProgress, clearDailyProgress, router]);
 
   // View completed puzzle in read-only mode (shows solution)
   const viewCompletedPuzzle = useCallback(() => {

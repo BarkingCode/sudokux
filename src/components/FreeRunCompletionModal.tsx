@@ -3,7 +3,7 @@
  * Shows time, mistakes, and options to continue or return to Free Run screen.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
 import { Trophy } from 'lucide-react-native';
@@ -11,6 +11,7 @@ import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
 import { useTheme } from '../context/ThemeContext';
 import { Difficulty, GridType } from '../context/GameContext';
+import { maybeRequestReview } from '../services/storeReviewService';
 
 interface FreeRunCompletionModalProps {
   visible: boolean;
@@ -38,6 +39,13 @@ export const FreeRunCompletionModal: React.FC<FreeRunCompletionModalProps> = ({
   mistakes,
 }) => {
   const { colors } = useTheme();
+
+  // Request store review after game completion
+  useEffect(() => {
+    if (visible) {
+      maybeRequestReview();
+    }
+  }, [visible]);
 
   const getPerfectBonus = () => {
     if (mistakes === 0) return 'Perfect!';

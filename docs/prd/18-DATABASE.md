@@ -51,7 +51,7 @@ CREATE TABLE game_sessions (
   difficulty TEXT NOT NULL,
   time_seconds INTEGER,
   mistakes INTEGER DEFAULT 0,
-  hints_used INTEGER DEFAULT 0,
+  helper_used INTEGER DEFAULT 0,
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -70,7 +70,7 @@ CREATE TABLE chapter_completions (
   solution_grid JSONB NOT NULL,
   time_seconds INTEGER NOT NULL,
   mistakes INTEGER DEFAULT 0,
-  hints_used INTEGER DEFAULT 0,
+  helper_used INTEGER DEFAULT 0,
   completed_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, puzzle_number)
@@ -103,7 +103,7 @@ CREATE TABLE daily_completions (
   challenge_date DATE NOT NULL,
   time_seconds INTEGER NOT NULL,
   mistakes INTEGER DEFAULT 0,
-  hints_used INTEGER DEFAULT 0,
+  helper_used INTEGER DEFAULT 0,
   completed_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, challenge_date)
 );
@@ -202,21 +202,21 @@ DECLARE
 BEGIN
   -- Count from game_sessions
   SELECT COUNT(*), COUNT(*) FILTER (WHERE completed),
-         COALESCE(SUM(mistakes), 0), COALESCE(SUM(hints_used), 0)
+         COALESCE(SUM(mistakes), 0), COALESCE(SUM(helper_used), 0)
   INTO v_total_games, v_total_wins, v_total_mistakes, v_total_hints
   FROM game_sessions WHERE user_id = p_user_id;
 
   -- Add chapter_completions
   SELECT v_total_games + COUNT(*), v_total_wins + COUNT(*),
          v_total_mistakes + COALESCE(SUM(mistakes), 0),
-         v_total_hints + COALESCE(SUM(hints_used), 0)
+         v_total_hints + COALESCE(SUM(helper_used), 0)
   INTO v_total_games, v_total_wins, v_total_mistakes, v_total_hints
   FROM chapter_completions WHERE user_id = p_user_id;
 
   -- Add daily_completions
   SELECT v_total_games + COUNT(*), v_total_wins + COUNT(*),
          v_total_mistakes + COALESCE(SUM(mistakes), 0),
-         v_total_hints + COALESCE(SUM(hints_used), 0)
+         v_total_hints + COALESCE(SUM(helper_used), 0)
   INTO v_total_games, v_total_wins, v_total_mistakes, v_total_hints
   FROM daily_completions WHERE user_id = p_user_id;
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import * as Sentry from '@sentry/react-native';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { NetworkProvider } from '../src/context/NetworkContext';
@@ -16,6 +17,7 @@ import { offlineQueue } from '../src/services/offlineQueue';
 import { STORAGE_KEYS } from '../src/utils/storage';
 import { badgeService } from '../src/services/badgeService';
 import { getOrCreateUserIdentity, initializeUserWithBackend } from '../src/utils/identity';
+import { initializeFacebookSDK } from '../src/services/facebookAnalytics';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -39,6 +41,16 @@ function NotificationHandler() {
     // Initialize services with user ID
     const initServices = async () => {
       try {
+        // Initialize Facebook SDK for analytics
+        await initializeFacebookSDK();
+
+        // Request App Tracking Transparency permission (iOS only)
+        // This enables personalized ads for higher ad revenue
+        if (Platform.OS === 'ios') {
+          const { status } = await requestTrackingPermissionsAsync();
+          console.log('[ATT] Tracking permission:', status);
+        }
+
         // Initialize offline queue
         await offlineQueue.initialize();
 
