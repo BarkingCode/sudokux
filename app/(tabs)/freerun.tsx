@@ -288,7 +288,7 @@ export default function FreeRunScreen() {
             style={styles.startButton}
           />
           <BrutalistText size={11} mono muted style={styles.hint}>
-            {freeRunGamesRemaining} games remaining
+            {freeRunGamesRemaining} games remaining today. Watch an ad for more when you run out.
           </BrutalistText>
         </Animated.View>
       </ScrollView>

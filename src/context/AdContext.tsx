@@ -10,8 +10,8 @@
  * - useRewardedAd: Rewarded ad lifecycle
  */
 
-import React, { createContext, useContext, useCallback, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useCallback, useState, useEffect, useRef } from 'react';
+import { Platform, AppState, AppStateStatus } from 'react-native';
 import { useAdSession } from '../hooks/useAdSession';
 import { useInterstitialAd } from '../hooks/useInterstitialAd';
 import { useRewardedAd } from '../hooks/useRewardedAd';
@@ -38,6 +38,9 @@ interface AdContextType {
   isInterstitialAdReady: boolean;
   isRewardedAdReady: boolean;
   isLoadingAd: boolean;
+
+  // Daily reset
+  checkAndResetDaily: () => boolean;
 }
 
 const AdContext = createContext<AdContextType | undefined>(undefined);
@@ -55,6 +58,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     isAtFreeRunLimit,
     consumeFreeRunGame,
     addFreeRunGames,
+    checkAndResetDaily,
   } = useAdSession(isAdFree);
 
   // Interstitial ad (for Chapters)
@@ -69,6 +73,20 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Helper rewarded ad (for Smart Helper) - does NOT grant free games
   const helperRewardedAd = useHelperRewardedAd({ isAdFree });
+
+  // Check for daily reset when app comes to foreground (e.g., after midnight)
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to foreground - check for daily reset
+        checkAndResetDaily();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [checkAndResetDaily]);
 
   // Called when Chapter puzzle is completed - may show interstitial
   const onChapterComplete = useCallback(async (): Promise<void> => {
@@ -122,6 +140,8 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         isInterstitialAdReady: interstitialAd.isReady,
         isRewardedAdReady: rewardedAd.isReady,
         isLoadingAd: rewardedAd.isLoading,
+        // Daily reset
+        checkAndResetDaily,
       }}
     >
       {children}

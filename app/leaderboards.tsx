@@ -14,7 +14,6 @@ import * as Haptics from 'expo-haptics';
 import { BrutalistText } from '../src/components/BrutalistText';
 import { useTheme } from '../src/context/ThemeContext';
 import { pointService, type PointsLeaderboardEntry, type UserPointsRank, DIFFICULTY_POINTS, DIFFICULTY_POINTS_6X6 } from '../src/services/pointService';
-import { gameCenterService } from '../src/services/gameCenter';
 import { loadSecureData, STORAGE_KEYS } from '../src/utils/storage';
 import { statsService } from '../src/services/statsService';
 import type { UserStats } from '../src/lib/database.types';
@@ -203,11 +202,6 @@ export default function LeaderboardsScreen() {
     setViewMode(mode);
   }, []);
 
-  const handleShowGameCenter = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await gameCenterService.showLeaderboard();
-  }, []);
-
   const isUserInList = entries.some((e) => e.userId === userId);
 
   return (
@@ -286,14 +280,14 @@ export default function LeaderboardsScreen() {
       </Animated.View>
 
       {/* Points Info */}
-      <Animated.View entering={FadeInUp.delay(175).springify()} style={styles.pointsInfoContainer}>
+      {/* <Animated.View entering={FadeInUp.delay(175).springify()} style={styles.pointsInfoContainer}>
         <BrutalistText size={10} mono muted center>
           9x9: Easy={DIFFICULTY_POINTS.easy} | Med={DIFFICULTY_POINTS.medium} | Hard={DIFFICULTY_POINTS.hard} | Ext={DIFFICULTY_POINTS.extreme} | Ins={DIFFICULTY_POINTS.insane} | Inh={DIFFICULTY_POINTS.inhuman}
         </BrutalistText>
         <BrutalistText size={10} mono muted center style={{ marginTop: 2 }}>
           6x6: Easy={DIFFICULTY_POINTS_6X6.easy} | Med={DIFFICULTY_POINTS_6X6.medium} | Hard={DIFFICULTY_POINTS_6X6.hard} | Ext={DIFFICULTY_POINTS_6X6.extreme} | Ins={DIFFICULTY_POINTS_6X6.insane} | Inh={DIFFICULTY_POINTS_6X6.inhuman}
         </BrutalistText>
-      </Animated.View>
+      </Animated.View> */}
 
       {/* Your Stats Card */}
       {!isLoading && userRank.points > 0 && (
@@ -422,18 +416,6 @@ export default function LeaderboardsScreen() {
                   <PointsLeaderboardRow entry={userEntry} isCurrentUser index={0} />
                 </View>
               )}
-
-              {/* Game Center Button */}
-              {gameCenterService.isGameCenterAvailable() && (
-                <Pressable
-                  onPress={handleShowGameCenter}
-                  style={[styles.gameCenterButton, { borderColor: colors.muted }]}
-                >
-                  <BrutalistText size={14} mono muted>
-                    View in Game Center
-                  </BrutalistText>
-                </Pressable>
-              )}
             </>
           )}
         </ScrollView>
@@ -550,14 +532,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: 'center',
   },
-  gameCenterButton: {
-    borderWidth: 2,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
   yourStatsCard: {
     marginHorizontal: 20,
+    marginTop: 16,
     marginBottom: 16,
     borderWidth: 2,
     padding: 16,

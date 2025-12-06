@@ -21,13 +21,15 @@ import { useGame, Difficulty, GridType, DailyInProgress } from '../../src/contex
 import {
   getTodayChallenge,
   getTodayCompletion,
-  getDailyLeaderboard,
   getDailyStreakInfo,
-  getUserDailyRank,
   DailyChallenge,
   DailyCompletion,
-  DailyLeaderboardEntry,
 } from '../../src/services/dailyChallengeService';
+import {
+  getDailyLeaderboard,
+  getUserDailyRank,
+  DailyLeaderboardEntry,
+} from '../../src/services/dailyLeaderboardService';
 import { getLocalDateString } from '../../src/utils/dateUtils';
 import { loadSecureData, STORAGE_KEYS } from '../../src/utils/storage';
 

@@ -3,7 +3,7 @@ export default {
     name: 'X-Sudoku',
     slug: 'sudokux',
     scheme: 'sudokux',
-    version: '1.0.3',
+    version: '1.0.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',

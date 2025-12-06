@@ -6,7 +6,20 @@
  *
  * Supports both iOS and Android platforms.
  */
-import { Settings, AppEventsLogger } from 'react-native-fbsdk-next';
+
+let Settings: any = null;
+let AppEventsLogger: any = null;
+let isNativeModuleAvailable = false;
+
+// Safely import Facebook SDK - it requires native modules
+try {
+  const fbsdk = require('react-native-fbsdk-next');
+  Settings = fbsdk.Settings;
+  AppEventsLogger = fbsdk.AppEventsLogger;
+  isNativeModuleAvailable = true;
+} catch (error) {
+  console.log('[FacebookAnalytics] Native module not available - running in limited mode');
+}
 
 let isInitialized = false;
 
@@ -15,7 +28,7 @@ let isInitialized = false;
  * Call this once at app startup in _layout.tsx
  */
 export const initializeFacebookSDK = async (): Promise<void> => {
-  if (isInitialized) {
+  if (isInitialized || !isNativeModuleAvailable) {
     return;
   }
 
@@ -41,6 +54,7 @@ export const initializeFacebookSDK = async (): Promise<void> => {
  * @param difficulty - The difficulty level of the completed game
  */
 export const logGameCompleted = (difficulty: string): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     AppEventsLogger.logEvent('sudoku_game_completed', { difficulty });
   } catch (error) {
@@ -54,6 +68,7 @@ export const logGameCompleted = (difficulty: string): void => {
  * @param gridType - The grid type (9x9 or 6x6)
  */
 export const logGameStarted = (difficulty: string, gridType: string): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     AppEventsLogger.logEvent('sudoku_game_started', {
       difficulty,
@@ -70,6 +85,7 @@ export const logGameStarted = (difficulty: string, gridType: string): void => {
  * @param timeSeconds - Time taken to complete in seconds
  */
 export const logDailyChallengeCompleted = (difficulty: string, timeSeconds: number): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     AppEventsLogger.logEvent('daily_challenge_completed', {
       difficulty,
@@ -86,6 +102,7 @@ export const logDailyChallengeCompleted = (difficulty: string, timeSeconds: numb
  * @param totalStars - Total stars earned
  */
 export const logChapterCompleted = (chapterId: number, totalStars: number): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     AppEventsLogger.logEvent('chapter_completed', {
       chapter_id: chapterId,
@@ -105,6 +122,7 @@ export const logEvent = (
   eventName: string,
   params?: Record<string, string | number>
 ): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     if (params) {
       AppEventsLogger.logEvent(eventName, params);
@@ -127,6 +145,7 @@ export const logPurchase = (
   currency: string,
   params?: Record<string, string | number>
 ): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     if (params) {
       AppEventsLogger.logPurchase(amount, currency, params);
@@ -143,6 +162,7 @@ export const logPurchase = (
  * @param adType - Type of ad (e.g., 'interstitial', 'rewarded')
  */
 export const logAdImpression = (adType: string): void => {
+  if (!isNativeModuleAvailable) return;
   try {
     AppEventsLogger.logEvent('ad_impression', { ad_type: adType });
   } catch (error) {

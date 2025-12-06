@@ -31,6 +31,20 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const rewardEarnedRef = useRef(false);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debug log on mount
+  useEffect(() => {
+    console.log('[useRewardedAd] Hook mounted', { isAdFree, platform: Platform.OS });
+  }, []);
+
+  // Clear loading timeout
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
 
   // Load rewarded ad
   const loadAd = useCallback(() => {
@@ -42,8 +56,19 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
     console.log('[useRewardedAd] Loading rewarded ad...');
     setIsReady(false);
     setIsLoading(true);
+
+    // Clear any existing timeout
+    clearLoadTimeout();
+
+    // Timeout to prevent infinite loading state (10 seconds in dev, 30 in prod)
+    const timeoutMs = __DEV__ ? 10000 : 30000;
+    loadTimeoutRef.current = setTimeout(() => {
+      console.log('[useRewardedAd] Load timeout - resetting loading state');
+      setIsLoading(false);
+    }, timeoutMs);
+
     rewardedAd.load();
-  }, [isAdFree]);
+  }, [isAdFree, clearLoadTimeout]);
 
   // Set up event listeners and initial load
   useEffect(() => {
@@ -53,6 +78,7 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
       RewardedAdEventType.LOADED,
       () => {
         console.log('[useRewardedAd] Ad loaded successfully');
+        clearLoadTimeout();
         setIsReady(true);
         setIsLoading(false);
       }
@@ -88,6 +114,7 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
       AdEventType.ERROR,
       (error) => {
         console.log('[useRewardedAd] Ad error:', error);
+        clearLoadTimeout();
         setIsReady(false);
         setIsLoading(false);
       }
@@ -97,13 +124,14 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
     loadAd();
 
     return () => {
+      clearLoadTimeout();
       loadedUnsub();
       openedUnsub();
       earnedUnsub();
       closedUnsub();
       errorUnsub();
     };
-  }, [loadAd]);
+  }, [loadAd, clearLoadTimeout]);
 
   // Show rewarded ad and return whether reward was earned
   const show = useCallback((): Promise<boolean> => {

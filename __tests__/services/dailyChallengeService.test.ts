@@ -9,11 +9,13 @@ import {
   hasCompletedToday,
   getTodayCompletion,
   submitDailyCompletion,
-  getDailyLeaderboard,
-  getUserDailyRank,
   getDailyStreakInfo,
   DailyChallenge,
 } from '../../src/services/dailyChallengeService';
+import {
+  getDailyLeaderboard,
+  getUserDailyRank,
+} from '../../src/services/dailyLeaderboardService';
 
 // Mock challenge object for testing
 const mockChallenge: DailyChallenge = {

@@ -11,13 +11,12 @@ import { Trophy } from 'lucide-react-native';
 import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
 import { useTheme } from '../context/ThemeContext';
+import { submitDailyCompletion, DailyChallenge } from '../services/dailyChallengeService';
 import {
-  submitDailyCompletion,
   getDailyLeaderboard,
   getUserDailyRank,
   DailyLeaderboardEntry,
-  DailyChallenge,
-} from '../services/dailyChallengeService';
+} from '../services/dailyLeaderboardService';
 import { badgeService } from '../services/badgeService';
 import { checkAchievements } from '../services/achievementService';
 import { logDailyChallengeCompleted, logGameCompleted } from '../services/facebookAnalytics';

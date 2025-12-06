@@ -9,7 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { activateKeepAwakeAsync, deactivateKeepAwakeAsync } from 'expo-keep-awake';
+import * as KeepAwake from 'expo-keep-awake';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { useTheme } from '../context/ThemeContext';
@@ -29,6 +29,23 @@ import { ViewOnlyStats } from '../components/game/ViewOnlyStats';
 import { GameModalsManager } from '../components/game/GameModalsManager';
 import { useGameModals, useUserId, useGameCompletion, getPuzzleDifficulty } from '../hooks';
 import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
+import { GameLimitModal } from '../components/GameLimitModal';
+
+// Keep-awake helper functions with safe fallbacks
+const activateKeepAwake = () => {
+  try {
+    KeepAwake.activateKeepAwake();
+  } catch {
+    // Silently fail if not available
+  }
+};
+const deactivateKeepAwake = () => {
+  try {
+    KeepAwake.deactivateKeepAwake();
+  } catch {
+    // Silently fail if not available
+  }
+};
 
 const { width, height } = Dimensions.get('window');
 // Detect iPad for layout adjustments
@@ -68,7 +85,13 @@ export default function GameScreen() {
     clearDailyProgress,
     incrementMistakes,
   } = useGame();
-  const { onChapterComplete: showChapterAd, isAdFree } = useAds();
+  const {
+    onChapterComplete: showChapterAd,
+    isAdFree,
+    consumeFreeRunGame,
+    isAtFreeRunLimit,
+    checkAndResetDaily,
+  } = useAds();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const modals = useGameModals();
@@ -106,6 +129,7 @@ export default function GameScreen() {
   const [notesMode, setNotesMode] = useState(false);
   const [chapterGamesCount, setChapterGamesCount] = useState(initialChapterGamesCompleted);
   const [showHelperAdModal, setShowHelperAdModal] = useState(false);
+  const [showGameLimitModal, setShowGameLimitModal] = useState(false);
 
   // Ref to access current gameState in cleanup without causing re-renders
   const gameStateRef = useRef(gameState);
@@ -175,12 +199,12 @@ export default function GameScreen() {
   // Keep screen awake during active gameplay
   useEffect(() => {
     if (gameState && !gameState.isComplete && !gameState.isPaused && !isViewOnly) {
-      activateKeepAwakeAsync();
+      activateKeepAwake();
     } else {
-      deactivateKeepAwakeAsync();
+      deactivateKeepAwake();
     }
     return () => {
-      deactivateKeepAwakeAsync();
+      deactivateKeepAwake();
     };
   }, [gameState?.isComplete, gameState?.isPaused, isViewOnly]);
 
@@ -432,12 +456,28 @@ export default function GameScreen() {
     // Clear saved Free Run state since we're starting fresh
     await removeData(STORAGE_KEYS.FREERUN_GAME_STATE);
 
-    // Close the modal
+    // Close the completion modal first
     modals.closeFreeRunModal();
+
+    // Check for daily reset before checking limit
+    checkAndResetDaily();
+
+    // Check if user has games remaining
+    if (isAtFreeRunLimit) {
+      setShowGameLimitModal(true);
+      return;
+    }
+
+    // Consume a game from the session
+    const canPlay = consumeFreeRunGame();
+    if (!canPlay) {
+      setShowGameLimitModal(true);
+      return;
+    }
 
     // Start a new game with the same difficulty and grid type
     startNewGame(currentDifficulty, currentGridType);
-  }, [gameState, modals, saveFreeRunCompletion, startNewGame]);
+  }, [gameState, modals, saveFreeRunCompletion, startNewGame, checkAndResetDaily, isAtFreeRunLimit, consumeFreeRunGame]);
 
   // Handle back to free run
   const handleBackToFreeRun = useCallback(async () => {
@@ -449,6 +489,17 @@ export default function GameScreen() {
     modals.closeFreeRunModal();
     router.back();
   }, [router, modals, saveFreeRunCompletion]);
+
+  // Handle unlock from GameLimitModal (after watching ad in play again flow)
+  const handleGameLimitUnlocked = useCallback(() => {
+    if (!gameState) return;
+
+    setShowGameLimitModal(false);
+
+    // After watching ad, games are already added by the ad context
+    // Start a new game with the same settings
+    startNewGame(gameState.difficulty, gameState.gridType);
+  }, [gameState, startNewGame]);
 
   // Handle daily modal close
   const handleDailyModalClose = useCallback(() => {
@@ -600,6 +651,15 @@ export default function GameScreen() {
           onPlayAgain: handleFreeRunPlayAgain,
         }}
       />
+
+      {/* Game Limit Modal for Play Again flow */}
+      {isFreeRun && (
+        <GameLimitModal
+          visible={showGameLimitModal}
+          onClose={() => setShowGameLimitModal(false)}
+          onUnlocked={handleGameLimitUnlocked}
+        />
+      )}
 
       {/* Banner Ad */}
       {showBanner && (

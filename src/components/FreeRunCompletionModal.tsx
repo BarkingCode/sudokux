@@ -111,7 +111,7 @@ export const FreeRunCompletionModal: React.FC<FreeRunCompletionModalProps> = ({
           {/* Buttons */}
           <View style={styles.footer}>
             <BrutalistButton
-              title="PLAY AGAIN"
+              title="PLAY ANOTHER"
               onPress={onPlayAgain}
               size="large"
               style={styles.playAgainButton}

@@ -3,7 +3,6 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import * as Sentry from '@sentry/react-native';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { NetworkProvider } from '../src/context/NetworkContext';
@@ -47,8 +46,13 @@ function NotificationHandler() {
         // Request App Tracking Transparency permission (iOS only)
         // This enables personalized ads for higher ad revenue
         if (Platform.OS === 'ios') {
-          const { status } = await requestTrackingPermissionsAsync();
-          console.log('[ATT] Tracking permission:', status);
+          try {
+            const { requestTrackingPermissionsAsync } = await import('expo-tracking-transparency');
+            const { status } = await requestTrackingPermissionsAsync();
+            console.log('[ATT] Tracking permission:', status);
+          } catch (error) {
+            console.log('[ATT] Native module not available');
+          }
         }
 
         // Initialize offline queue

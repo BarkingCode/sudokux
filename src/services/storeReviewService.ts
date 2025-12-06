@@ -4,7 +4,6 @@
  * Handles app store review prompts after game completions.
  * Triggers review request every 4 completions until user has reviewed.
  */
-import * as StoreReview from 'expo-store-review';
 import { loadData, saveData, STORAGE_KEYS } from '../utils/storage';
 
 /**
@@ -28,12 +27,17 @@ export const maybeRequestReview = async (): Promise<void> => {
 
     // Request review every 4 completions
     if (newCount % 4 === 0) {
-      const canRequest = await StoreReview.hasAction();
-      if (canRequest) {
-        await StoreReview.requestReview();
-        // Mark as reviewed (user has seen the prompt)
-        await saveData(STORAGE_KEYS.HAS_REVIEWED_APP, true);
-        console.log('[StoreReview] Review requested after', newCount, 'completions');
+      try {
+        const StoreReview = await import('expo-store-review');
+        const canRequest = await StoreReview.hasAction();
+        if (canRequest) {
+          await StoreReview.requestReview();
+          // Mark as reviewed (user has seen the prompt)
+          await saveData(STORAGE_KEYS.HAS_REVIEWED_APP, true);
+          console.log('[StoreReview] Review requested after', newCount, 'completions');
+        }
+      } catch (moduleError) {
+        console.log('[StoreReview] Native module not available');
       }
     }
   } catch (error) {

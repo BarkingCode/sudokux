@@ -11,14 +11,6 @@ import { generatePuzzle } from '../game/generator';
 import { Difficulty, GridType } from '../game/types';
 import { getLocalDateString, getYesterdayLocalDateString } from '../utils/dateUtils';
 
-// Re-export leaderboard functions for backwards compatibility
-export {
-  getDailyLeaderboard,
-  getUserDailyRank,
-  checkLeaderboardPlacement,
-  type DailyLeaderboardEntry,
-} from './dailyLeaderboardService';
-
 export interface DailyChallenge {
   id: string;
   challenge_date: string;
