@@ -1,16 +1,24 @@
 /**
  * Tab navigation layout.
  * Contains four tabs: Chapters (default), Daily Challenge, Free Run, and Board.
+ * Shows notification dot on Daily tab when today's challenge is not completed.
  */
 
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookOpen, CalendarHeart, Zap, Award } from 'lucide-react-native';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useDailyStatus } from '../../src/context/DailyStatusContext';
+import { TabBadgeDot } from '../../src/components/TabBadgeDot';
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { hasCompletedTodayChallenge, isLoading } = useDailyStatus();
   const insets = useSafeAreaInsets();
+
+  // Show dot when NOT completed (and not loading)
+  const showDailyDot = !isLoading && !hasCompletedTodayChallenge;
 
   return (
     <Tabs
@@ -49,7 +57,10 @@ export default function TabLayout() {
         options={{
           title: 'Daily',
           tabBarIcon: ({ color }) => (
-            <CalendarHeart size={22} color={color} strokeWidth={2.5} />
+            <View>
+              <CalendarHeart size={22} color={color} strokeWidth={2.5} />
+              <TabBadgeDot visible={showDailyDot} color={colors.mistake} />
+            </View>
           ),
         }}
       />

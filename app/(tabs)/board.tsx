@@ -193,10 +193,6 @@ export default function BoardScreen() {
     setShowPointSystemModal(true);
   }, []);
 
-  const winRate = stats
-    ? Math.round(((stats.total_wins || 0) / Math.max(stats.total_games || 1, 1)) * 100)
-    : 0;
-
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -316,23 +312,23 @@ export default function BoardScreen() {
                   index={0}
                 />
                 <StatCard
-                  label="Wins"
-                  value={stats.total_wins || 0}
-                  subtitle={`${winRate}% win rate`}
+                  label="Avg Mistakes"
+                  value={stats.total_games ? ((stats.total_mistakes || 0) / stats.total_games).toFixed(1) : '0'}
+                  subtitle="per game"
                   index={1}
                 />
               </View>
               <View style={[styles.statsRow, { marginTop: 12 }]}>
                 <StatCard
-                  label="Current Streak"
-                  value={stats.current_streak || 0}
+                  label="Daily Streak"
+                  value={stats.daily_streak || 0}
                   subtitle="days"
-                  highlighted={(stats.current_streak || 0) >= 7}
+                  highlighted={(stats.daily_streak || 0) >= 7}
                   index={2}
                 />
                 <StatCard
                   label="Best Streak"
-                  value={stats.best_streak || 0}
+                  value={stats.best_daily_streak || 0}
                   subtitle="days"
                   index={3}
                 />

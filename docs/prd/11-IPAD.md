@@ -31,7 +31,7 @@ const isTablet = Platform.OS === 'ios' &&
 - Bottom padding: 24px (room for ad banner)
 - Top padding: 16px
 
-## Profile/Stats Screen
+## Board Screen
 
 ### HeatmapCalendar (Play History)
 - **Responsive width**: Fills available container

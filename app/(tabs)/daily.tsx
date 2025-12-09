@@ -17,14 +17,17 @@ import { BannerAd } from '../../src/components/BannerAd';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { StreakDisplay } from '../../src/components/StreakDisplay';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useDailyStatus } from '../../src/context/DailyStatusContext';
 import { useGame, Difficulty, GridType, DailyInProgress } from '../../src/context/GameContext';
 import {
   getTodayChallenge,
   getTodayCompletion,
   getDailyStreakInfo,
+  getCompletionHistory,
   DailyChallenge,
   DailyCompletion,
 } from '../../src/services/dailyChallengeService';
+import { DailyCalendar } from '../../src/components/DailyCalendar';
 import {
   getDailyLeaderboard,
   getUserDailyRank,
@@ -51,6 +54,7 @@ const formatDate = (dateStr: string): string => {
 export default function DailyScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { markAsCompleted } = useDailyStatus();
   const { loadDailyPuzzle, loadSavedPuzzleWithProgress, loadDailyProgress, clearDailyProgress } = useGame();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +65,9 @@ export default function DailyScreen() {
   const [userRank, setUserRank] = useState<number | null>(null);
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [userId, setUserId] = useState<string | null>(null);
+  const [completionHistory, setCompletionHistory] = useState<
+    Array<{ date: string; timeSeconds: number; mistakes: number }>
+  >([]);
 
   const loadDailyData = useCallback(async () => {
     try {
@@ -84,20 +91,26 @@ export default function DailyScreen() {
 
       // Load user-specific data if we have a user ID
       if (uid) {
-        const [userCompletion, streakInfo, rank, board] = await Promise.all([
+        const [userCompletion, streakInfo, rank, board, history] = await Promise.all([
           getTodayCompletion(uid),
           getDailyStreakInfo(uid),
           getUserDailyRank(uid),
           getDailyLeaderboard(20),
+          getCompletionHistory(uid, 3),
         ]);
 
         setCompletion(userCompletion);
+        // Update global daily status for tab badge
+        if (userCompletion) {
+          markAsCompleted();
+        }
         setStreak({
           current: streakInfo?.currentStreak || 0,
           best: streakInfo?.bestStreak || 0,
         });
         setUserRank(rank);
         setLeaderboard(board);
+        setCompletionHistory(history);
       } else {
         // Just load leaderboard for anonymous users
         const board = await getDailyLeaderboard(20);
@@ -217,13 +230,36 @@ export default function DailyScreen() {
     );
   }
 
+  // Show error state if challenge couldn't be loaded
+  if (!challenge) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <View style={styles.errorContainer}>
+          <BrutalistText size={24} bold uppercase style={{ marginBottom: 12 }}>
+            UNAVAILABLE
+          </BrutalistText>
+          <BrutalistText size={14} mono muted style={{ textAlign: 'center', marginBottom: 24 }}>
+            Today's challenge couldn't be loaded.{'\n'}Please check your connection and try again.
+          </BrutalistText>
+          <BrutalistButton
+            title="TRY AGAIN"
+            onPress={handleRefresh}
+            size="medium"
+            loading={isRefreshing}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const hasCompleted = !!completion;
   const today = getLocalDateString();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <OfflineBanner message="Offline - Using local puzzle. Leaderboard unavailable." />
+      <OfflineBanner message="Offline - Daily challenge unavailable." />
 
       <ScrollView
         style={styles.scrollView}
@@ -359,9 +395,16 @@ export default function DailyScreen() {
           />
         </Animated.View>
 
+        {/* Calendar View */}
+        {userId && (
+          <Animated.View entering={FadeInUp.delay(350).springify()} style={styles.calendarSection}>
+            <DailyCalendar completions={completionHistory} />
+          </Animated.View>
+        )}
+
         {/* Leaderboard */}
         {leaderboard.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(400).springify()} style={styles.leaderboardSection}>
+          <Animated.View entering={FadeInUp.delay(450).springify()} style={styles.leaderboardSection}>
             <BrutalistText size={12} mono uppercase muted style={styles.sectionTitle}>
               Today's Leaderboard
             </BrutalistText>
@@ -425,6 +468,10 @@ const styles = StyleSheet.create({
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
   scrollView: {
     flex: 1,
@@ -497,6 +544,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   streakSection: {
+    marginBottom: 24,
+  },
+  calendarSection: {
     marginBottom: 24,
   },
   streakRow: {

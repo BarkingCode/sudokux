@@ -14,9 +14,9 @@ The primary competitive ranking based on total points accumulated.
    - Players filtered by country
    - Same ranking within country
 
-### Profile Integration
+### Board Screen Integration
 
-The Board/Profile screen shows:
+The Board screen shows:
 - Top 5 global leaderboard entries
 - User's own rank and points
 - "View All" links to full leaderboard screen
@@ -103,7 +103,7 @@ master_hard: hard_wins >= 20
 chapter_complete: any chapter puzzle completed
 ```
 
-### Profile Display
+### Board Screen Display
 
 Achievements shown on Board screen:
 - Horizontal scrollable list

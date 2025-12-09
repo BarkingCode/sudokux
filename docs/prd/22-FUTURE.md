@@ -2,11 +2,11 @@
 
 The following features are planned for future releases:
 
-## Stats & Profile Screen
+## Stats & Board Screen Enhancements
 
-A dedicated screen displaying comprehensive user statistics:
+Enhancements for the Board screen displaying comprehensive user statistics:
 
-### User Profile Section
+### User Info Section
 * User avatar/icon
 * Nickname
 * Total XP and Level

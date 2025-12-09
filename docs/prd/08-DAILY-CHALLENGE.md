@@ -41,11 +41,9 @@ CREATE INDEX idx_daily_completions_challenge_id ON daily_completions(challenge_i
 
 * Runs daily at **12:00 UTC** (noon) to generate **tomorrow's puzzle**
 * This ensures puzzles are ready 12+ hours before earliest timezone (UTC+14) needs them
-* Difficulty rotation by day of week:
-  - Monday/Tuesday: Easy
-  - Wednesday/Thursday: Medium
-  - Friday/Saturday: Hard
-  - Sunday: Extreme
+* Difficulty: Randomly selected from Easy, Medium, or Hard only
+  - Extreme, Insane, and Inhuman levels are excluded from daily challenges
+  - This ensures daily puzzles are accessible to all skill levels
 * Grid type: Always 9×9 for daily challenges
 
 **Cron Schedule:**
@@ -59,11 +57,11 @@ CREATE INDEX idx_daily_completions_challenge_id ON daily_completions(challenge_i
 3. Store in `daily_challenges` table
 4. Log success/failure
 
-**Fallback (Client-Side):**
-If no server puzzle exists for the local date, the app generates one using:
-- Deterministic difficulty based on day of week
-- Local puzzle generator with uniqueness validation
-- No leaderboard for fallback puzzles (id starts with "fallback-")
+**No Client-Side Fallback:**
+Since daily challenges are global competitions, no client-side fallback is generated. If the server puzzle is unavailable:
+- User sees an "Unavailable" message with a "Try Again" button
+- This ensures all users compete on the same puzzle
+- Prevents unfair advantages from locally-generated puzzles
 
 ## Daily Challenge Features
 

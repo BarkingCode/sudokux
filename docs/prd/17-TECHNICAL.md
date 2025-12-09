@@ -111,7 +111,7 @@ Show completion modal
 ### Stats Aggregation Flow
 
 ```
-Profile/Board screen loads
+Board screen loads
         ↓
 Parallel fetches from 3 sources:
   - game_sessions

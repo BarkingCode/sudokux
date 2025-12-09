@@ -2,11 +2,12 @@
 
 ## Tab Navigation
 
-Bottom tab bar with 3 main screens:
+Bottom tab bar with 4 main screens:
 
 1. **Chapters** (Home) - `app/(tabs)/index.tsx`
-2. **Free Run** - `app/(tabs)/freerun.tsx`
-3. **Board** (Profile) - `app/(tabs)/profile.tsx`
+2. **Daily** - `app/(tabs)/daily.tsx`
+3. **Free Run** - `app/(tabs)/freerun.tsx`
+4. **Board** - `app/(tabs)/board.tsx`
 
 ## Screen Details
 
@@ -25,7 +26,24 @@ Journey-style progression through sequential puzzles.
 - Tap current puzzle → Start/continue game
 - Locked puzzles → Not tappable
 
-### 2. Free Run Screen
+### 2. Daily Screen
+
+Global daily challenge - same puzzle for all users.
+
+**Layout:**
+- Header: Date + "DAILY"
+- Challenge card (difficulty, grid type, play button)
+- Streak display with milestones
+- Completion calendar (monthly view)
+- Today's leaderboard (top 10)
+
+**Features:**
+- One attempt per day
+- Global competition
+- Streak tracking
+- Tab notification dot when incomplete
+
+### 3. Free Run Screen
 
 Practice mode with full difficulty/grid selection.
 
@@ -41,7 +59,7 @@ Practice mode with full difficulty/grid selection.
 - Save/restore in-progress games
 - No progression tracking
 
-### 3. Board Screen (Profile)
+### 4. Board Screen
 
 User's stats, achievements, and leaderboards.
 

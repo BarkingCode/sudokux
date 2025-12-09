@@ -38,11 +38,11 @@ export default function FreeRunScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { startNewGame, loadSavedPuzzleWithProgress } = useGame();
-  const { isAtFreeRunLimit, consumeFreeRunGame, freeRunGamesRemaining } = useAds();
+  const { isAtLimit, consumeGame } = useAds();
   const [selectedGrid, setSelectedGrid] = useState<GridType>('9x9');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('easy');
-  const [savedGame, setSavedGame] = useState<GameState | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [savedGame, setSavedGame] = useState<GameState | null>(null);
 
   // Load saved Free Run game on focus
   useFocusEffect(
@@ -103,7 +103,7 @@ export default function FreeRunScreen() {
       grid: savedGame.grid,
       timer: savedGame.timer,
       mistakes: savedGame.mistakes,
-      helperUsed: savedGame.helperUsed,
+      hintsUsed: savedGame.hintsUsed,
       notes: savedGame.notes,
       history: savedGame.history || [],
     });
@@ -115,13 +115,13 @@ export default function FreeRunScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     // Check if user has games remaining
-    if (isAtFreeRunLimit) {
+    if (isAtLimit) {
       setShowLimitModal(true);
       return;
     }
 
     // Consume a game from the session
-    const canPlay = consumeFreeRunGame();
+    const canPlay = consumeGame();
     if (!canPlay) {
       setShowLimitModal(true);
       return;
@@ -133,7 +133,7 @@ export default function FreeRunScreen() {
 
     startNewGame(selectedDifficulty, selectedGrid);
     router.push('/game');
-  }, [selectedDifficulty, selectedGrid, startNewGame, router, isAtFreeRunLimit, consumeFreeRunGame]);
+  }, [selectedDifficulty, selectedGrid, startNewGame, router, isAtLimit, consumeGame]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -288,7 +288,9 @@ export default function FreeRunScreen() {
             style={styles.startButton}
           />
           <BrutalistText size={11} mono muted style={styles.hint}>
-            {freeRunGamesRemaining} games remaining today. Watch an ad for more when you run out.
+            {savedGame
+              ? "This will replace your current game"
+              : "No progress tracking - just play"}
           </BrutalistText>
         </Animated.View>
       </ScrollView>
@@ -301,13 +303,9 @@ export default function FreeRunScreen() {
         visible={showLimitModal}
         onClose={() => setShowLimitModal(false)}
         onUnlocked={() => {
-          setShowLimitModal(false);
           // After unlocking, start the game
-          removeData(STORAGE_KEYS.FREERUN_GAME_STATE).then(() => {
-            setSavedGame(null);
-            startNewGame(selectedDifficulty, selectedGrid);
-            router.push('/game');
-          });
+          startNewGame(selectedDifficulty, selectedGrid);
+          router.push('/game');
         }}
       />
     </SafeAreaView>

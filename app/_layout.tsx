@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { NetworkProvider } from '../src/context/NetworkContext';
+import { DailyStatusProvider } from '../src/context/DailyStatusContext';
 import { GameProvider } from '../src/context/GameContext';
 import { AdProvider } from '../src/context/AdContext';
 import { AchievementProvider } from '../src/context/AchievementContext';
@@ -121,17 +122,19 @@ function RootLayout() {
     <ErrorBoundary>
       <ThemeProvider>
         <NetworkProvider>
-          <AchievementProvider>
-            <AdProvider>
-              <GameProvider>
-                <View style={{ flex: 1 }}>
-                  <StatusBar style="auto" />
-                  <NotificationHandler />
-                  <Stack screenOptions={{ headerShown: false }} />
-                </View>
-              </GameProvider>
-            </AdProvider>
-          </AchievementProvider>
+          <DailyStatusProvider>
+            <AchievementProvider>
+              <AdProvider>
+                <GameProvider>
+                  <View style={{ flex: 1 }}>
+                    <StatusBar style="auto" />
+                    <NotificationHandler />
+                    <Stack screenOptions={{ headerShown: false }} />
+                  </View>
+                </GameProvider>
+              </AdProvider>
+            </AchievementProvider>
+          </DailyStatusProvider>
         </NetworkProvider>
       </ThemeProvider>
     </ErrorBoundary>
