@@ -62,6 +62,8 @@ export interface SavedPuzzleWithProgress extends SavedPuzzleData {
   helperUsed: number;
   notes: Record<string, number[]>;
   history?: string[]; // Undo history (optional for backwards compatibility)
+  isHelperUnlocked?: boolean; // Whether helper was unlocked for this game
+  isHelperActive?: boolean; // Whether helper is currently active
 }
 
 export interface DailyInProgress {
@@ -285,7 +287,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Load a saved puzzle with existing progress (for resuming mid-game)
    */
   const loadSavedPuzzleWithProgress = useCallback((data: SavedPuzzleWithProgress) => {
-    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, helperUsed, notes, history } = data;
+    const { puzzleId, difficulty, gridType, initialGrid, grid, solution, timer, mistakes, helperUsed, notes, history, isHelperUnlocked, isHelperActive } = data;
 
     const newState: GameState = {
       ...createInitialState(gridType),
@@ -303,6 +305,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading: false,
       isPaused: false,
       conflictCells: findConflictCells(grid, gridType),
+      isHelperUnlocked: isHelperUnlocked ?? false, // Restore helper unlock status
+      isHelperActive: isHelperActive ?? false, // Restore helper active status
     };
     setGameState(newState);
   }, []);
@@ -328,6 +332,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       notes: currentState.notes,
       savedAt: new Date().toISOString(),
       history: currentState.history,
+      isHelperUnlocked: currentState.isHelperUnlocked,
+      isHelperActive: currentState.isHelperActive,
     };
 
     await saveData(STORAGE_KEYS.CHAPTER_IN_PROGRESS, inProgress);
@@ -391,98 +397,109 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const updateCell = useCallback((row: number, col: number, value: number) => {
-    if (!gameState || gameState.isLoading) return;
+    setGameState(prev => {
+      if (!prev || prev.isLoading) return prev;
 
-    // Can't modify initial cells
-    if (gameState.initialGrid[row][col] !== 0) return;
+      // Can't modify initial cells
+      if (prev.initialGrid[row][col] !== 0) return prev;
 
-    // Record current grid state in history (for undo)
-    const snapshot = JSON.stringify(gameState.grid);
-    const newHistory = [...gameState.history, snapshot].slice(-50); // Keep last 50 moves
+      // Record current grid state in history (for undo)
+      const snapshot = JSON.stringify(prev.grid);
+      const newHistory = [...prev.history, snapshot].slice(-50); // Keep last 50 moves
 
-    // Deep copy grid
-    const newGrid = gameState.grid.map(r => [...r]);
-    newGrid[row][col] = value;
+      // Deep copy grid
+      const newGrid = prev.grid.map(r => [...r]);
+      newGrid[row][col] = value;
 
-    // Find conflicts
-    const conflictCells = findConflictCells(newGrid, gameState.gridType);
+      // Find conflicts
+      const conflictCells = findConflictCells(newGrid, prev.gridType);
 
-    // Check for completion (all cells filled and match solution)
-    const isComplete = newGrid.every((gridRow, r) =>
-      gridRow.every((cell, c) => cell === gameState.solution[r][c])
-    );
+      // Check for completion (all cells filled and match solution)
+      const isComplete = newGrid.every((gridRow, r) =>
+        gridRow.every((cell, c) => cell === prev.solution[r][c])
+      );
 
-    setGameState(prev => prev ? ({
-      ...prev,
-      grid: newGrid,
-      history: newHistory,
-      conflictCells,
-      isComplete,
-    }) : null);
-  }, [gameState]);
+      return {
+        ...prev,
+        grid: newGrid,
+        history: newHistory,
+        conflictCells,
+        isComplete,
+      };
+    });
+  }, []);
 
   const addNote = useCallback((row: number, col: number, value: number) => {
-    if (!gameState || gameState.isLoading) return;
+    setGameState(prev => {
+      if (!prev || prev.isLoading) return prev;
 
-    const key = `${row}-${col}`;
-    const currentNotes = gameState.notes[key] || [];
+      const key = `${row}-${col}`;
+      const currentNotes = prev.notes[key] || [];
 
-    if (!currentNotes.includes(value)) {
-      setGameState(prev => prev ? ({
+      if (currentNotes.includes(value)) return prev;
+
+      return {
         ...prev,
         notes: {
           ...prev.notes,
           [key]: [...currentNotes, value].sort((a, b) => a - b),
         },
-      }) : null);
-    }
-  }, [gameState]);
+      };
+    });
+  }, []);
 
   const removeNote = useCallback((row: number, col: number, value: number) => {
-    if (!gameState || gameState.isLoading) return;
+    setGameState(prev => {
+      if (!prev || prev.isLoading) return prev;
 
-    const key = `${row}-${col}`;
-    const currentNotes = gameState.notes[key] || [];
+      const key = `${row}-${col}`;
+      const currentNotes = prev.notes[key] || [];
 
-    setGameState(prev => prev ? ({
-      ...prev,
-      notes: {
-        ...prev.notes,
-        [key]: currentNotes.filter(n => n !== value),
-      },
-    }) : null);
-  }, [gameState]);
+      return {
+        ...prev,
+        notes: {
+          ...prev.notes,
+          [key]: currentNotes.filter(n => n !== value),
+        },
+      };
+    });
+  }, []);
 
   const undo = useCallback(() => {
-    if (!gameState || gameState.history.length === 0) return;
+    setGameState(prev => {
+      if (!prev || prev.history.length === 0) return prev;
 
-    // Pop the last state from history
-    const history = [...gameState.history];
-    const previousGrid = JSON.parse(history.pop()!) as number[][];
+      // Pop the last state from history
+      const history = [...prev.history];
+      const previousGrid = JSON.parse(history.pop()!) as number[][];
 
-    setGameState(prev => prev ? ({
-      ...prev,
-      grid: previousGrid,
-      history,
-      conflictCells: findConflictCells(previousGrid, prev.gridType),
-      isComplete: false, // Undo can't result in completion
-    }) : null);
-  }, [gameState]);
+      return {
+        ...prev,
+        grid: previousGrid,
+        history,
+        conflictCells: findConflictCells(previousGrid, prev.gridType),
+        isComplete: false, // Undo can't result in completion
+      };
+    });
+  }, []);
 
   const resetBoard = useCallback(() => {
-    if (!gameState) return;
+    setGameState(prev => {
+      if (!prev) return prev;
 
-    // Reset grid to initial state, clear history and notes
-    const resetGrid = gameState.initialGrid.map(row => [...row]);
-    setGameState(prev => prev ? ({
-      ...prev,
-      grid: resetGrid,
-      history: [],
-      notes: {},
-      conflictCells: findConflictCells(resetGrid, prev.gridType),
-      isComplete: false,
-    }) : null);
-  }, [gameState]);
+      // Reset grid to initial state, clear history and notes
+      const resetGrid = prev.initialGrid.map(row => [...row]);
+
+      return {
+        ...prev,
+        grid: resetGrid,
+        history: [],
+        notes: {},
+        conflictCells: findConflictCells(resetGrid, prev.gridType),
+        isComplete: false,
+      };
+    });
+  }, []);
 
   const pauseGame = useCallback(() => {
     setGameState(prev => prev ? ({ ...prev, isPaused: true }) : null);
@@ -523,19 +540,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // DEV ONLY: Auto-complete the puzzle with the solution
   const devAutoComplete = useCallback(() => {
-    if (!gameState || gameState.isLoading || gameState.isComplete) return;
+    setGameState(prev => {
+      if (!prev || prev.isLoading || prev.isComplete) return prev;
 
-    // Copy the solution to the grid
-    const newGrid = gameState.solution.map(r => [...r]);
+      // Copy the solution to the grid
+      const newGrid = prev.solution.map(r => [...r]);
 
-    setGameState(prev => prev ? ({
-      ...prev,
-      grid: newGrid,
-      notes: {},
-      conflictCells: [],
-      isComplete: true,
-    }) : null);
-  }, [gameState]);
+      return {
+        ...prev,
+        grid: newGrid,
+        notes: {},
+        conflictCells: [],
+        isComplete: true,
+      };
+    });
+  }, []);
 
   /**
    * Increment the mistake counter (called when user enters wrong number)

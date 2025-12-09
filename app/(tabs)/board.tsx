@@ -17,6 +17,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, Info } from 'lucide-react-native';
 import { BrutalistText } from '../../src/components/BrutalistText';
+import { BannerAd } from '../../src/components/BannerAd';
 import { AchievementBadge } from '../../src/components/AchievementBadge';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { PointsLeaderboardPreview } from '../../src/components/PointsLeaderboardPreview';
@@ -445,6 +446,9 @@ export default function BoardScreen() {
         onClose={() => setShowPointSystemModal(false)}
         currentGridType="9x9"
       />
+
+      {/* Banner Ad */}
+      <BannerAd />
     </SafeAreaView>
   );
 }

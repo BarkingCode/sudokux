@@ -61,13 +61,13 @@ function NotificationHandler() {
 
         // Get or create local user identity
         const identity = await getOrCreateUserIdentity();
-        console.log('User identity initialized:', identity.id);
+        console.log('[Identity] User identity initialized');
 
         // Sync with backend (creates user in Supabase if needed)
         const { identity: updatedIdentity, supabaseUser } = await initializeUserWithBackend(identity);
 
         if (supabaseUser) {
-          console.log('Supabase user synced:', supabaseUser.id);
+          console.log('[Identity] Supabase user synced');
 
           // Initialize notifications
           await notificationService.initialize(supabaseUser.id);

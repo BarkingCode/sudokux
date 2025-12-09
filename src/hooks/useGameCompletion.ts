@@ -6,6 +6,7 @@
 import { useEffect, useCallback } from 'react';
 import type { GameState } from '../context/GameContext';
 import type { UseGameModalsReturn } from './useGameModals';
+import { TIMING } from '../config/timing';
 
 interface UseGameCompletionOptions {
   gameState: GameState | null;
@@ -47,19 +48,19 @@ export const useGameCompletion = ({
         hasShownDailyModal.current = true;
         const timer = setTimeout(() => {
           openDailyModal();
-        }, 1000);
+        }, TIMING.MODAL_DELAYS.DAILY_COMPLETION);
         return () => clearTimeout(timer);
       } else if (isChapter && !hasShownChapterModal.current) {
         hasShownChapterModal.current = true;
         const timer = setTimeout(() => {
           openChapterModal();
-        }, 800);
+        }, TIMING.MODAL_DELAYS.CHAPTER_COMPLETION);
         return () => clearTimeout(timer);
       } else if (!hasShownFreeRunModal.current) {
         hasShownFreeRunModal.current = true;
         const timer = setTimeout(() => {
           openFreeRunModal();
-        }, 800);
+        }, TIMING.MODAL_DELAYS.FREERUN_COMPLETION);
         return () => clearTimeout(timer);
       }
     }

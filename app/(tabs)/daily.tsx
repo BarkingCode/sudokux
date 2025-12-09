@@ -157,6 +157,8 @@ export default function DailyScreen() {
         helperUsed: savedProgress.helperUsed,
         notes: savedProgress.notes,
         history: savedProgress.history,
+        isHelperUnlocked: savedProgress.isHelperUnlocked,
+        isHelperActive: savedProgress.isHelperActive,
       });
     } else {
       // Clear old progress and start fresh

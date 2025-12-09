@@ -406,6 +406,8 @@ export default function ChaptersScreen() {
           helperUsed: inProgressData.helperUsed,
           notes: inProgressData.notes,
           history: inProgressData.history || [],
+          isHelperUnlocked: inProgressData.isHelperUnlocked,
+          isHelperActive: inProgressData.isHelperActive,
         });
       } else {
         // Generate fresh deterministic puzzle

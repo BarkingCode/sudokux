@@ -19,6 +19,11 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { useGame, Difficulty, GridType, GameState } from '../../src/context/GameContext';
 import { useAds } from '../../src/context/AdContext';
 import { loadData, removeData, STORAGE_KEYS } from '../../src/utils/storage';
+import { formatTime } from '../../src/utils/timeFormatters';
+import { calculateProgress } from '../../src/utils/gridUtils';
+import { createScopedLogger } from '../../src/utils/logger';
+
+const log = createScopedLogger('FreeRun');
 
 const GRID_TYPES: { value: GridType; label: string; description: string }[] = [
   { value: '6x6', label: '6x6', description: 'Mini' },
@@ -38,7 +43,7 @@ export default function FreeRunScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { startNewGame, loadSavedPuzzleWithProgress } = useGame();
-  const { isAtLimit, consumeGame } = useAds();
+  const { consumeFreeRunGame, freeRunGamesRemaining, isAdFree } = useAds();
   const [selectedGrid, setSelectedGrid] = useState<GridType>('9x9');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('easy');
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -60,23 +65,8 @@ export default function FreeRunScreen() {
   // Calculate progress percentage for saved game
   const progressPercent = useMemo(() => {
     if (!savedGame) return 0;
-    const gridSize = savedGame.gridType === '6x6' ? 6 : 9;
-    const totalCells = gridSize * gridSize;
-    let filledCells = 0;
-    for (let r = 0; r < gridSize; r++) {
-      for (let c = 0; c < gridSize; c++) {
-        if (savedGame.grid[r][c] !== 0) filledCells++;
-      }
-    }
-    return Math.round((filledCells / totalCells) * 100);
+    return calculateProgress(savedGame.grid, savedGame.gridType);
   }, [savedGame]);
-
-  // Format time for display
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const handleGridSelect = useCallback((grid: GridType) => {
     Haptics.selectionAsync();
@@ -92,6 +82,17 @@ export default function FreeRunScreen() {
     if (!savedGame) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    // Check game limit for non-ad-free users (continuing counts as playing)
+    if (!isAdFree) {
+      const canPlay = consumeFreeRunGame();
+      log.debug('handleContinue: consumeFreeRunGame result', { canPlay });
+      if (!canPlay) {
+        log.debug('handleContinue: at limit, showing modal');
+        setShowLimitModal(true);
+        return;
+      }
+    }
+
     // Load the saved game state
     loadSavedPuzzleWithProgress({
       puzzleId: savedGame.puzzleId || 'freerun',
@@ -103,26 +104,25 @@ export default function FreeRunScreen() {
       grid: savedGame.grid,
       timer: savedGame.timer,
       mistakes: savedGame.mistakes,
-      hintsUsed: savedGame.hintsUsed,
+      helperUsed: savedGame.helperUsed,
       notes: savedGame.notes,
       history: savedGame.history || [],
+      isHelperUnlocked: savedGame.isHelperUnlocked,
+      isHelperActive: savedGame.isHelperActive,
     });
 
     router.push('/game');
-  }, [savedGame, loadSavedPuzzleWithProgress, router]);
+  }, [savedGame, loadSavedPuzzleWithProgress, router, isAdFree, consumeFreeRunGame]);
 
   const handleStartGame = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Check if user has games remaining
-    if (isAtLimit) {
-      setShowLimitModal(true);
-      return;
-    }
-
-    // Consume a game from the session
-    const canPlay = consumeGame();
+    // Consume a game from the session (uses ref for accurate sync check)
+    // This handles the limit check internally with up-to-date state
+    const canPlay = consumeFreeRunGame();
+    log.debug('handleStartGame: consumeFreeRunGame result', { canPlay });
     if (!canPlay) {
+      log.debug('handleStartGame: at limit, showing modal');
       setShowLimitModal(true);
       return;
     }
@@ -133,7 +133,7 @@ export default function FreeRunScreen() {
 
     startNewGame(selectedDifficulty, selectedGrid);
     router.push('/game');
-  }, [selectedDifficulty, selectedGrid, startNewGame, router, isAtLimit, consumeGame]);
+  }, [selectedDifficulty, selectedGrid, startNewGame, router, consumeFreeRunGame]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -292,6 +292,19 @@ export default function FreeRunScreen() {
               ? "This will replace your current game"
               : "No progress tracking - just play"}
           </BrutalistText>
+
+          {/* Games Remaining Counter - Only show for non-ad-free users */}
+          {!isAdFree && (
+            <View style={[styles.gamesRemainingBox, { borderColor: colors.muted }]}>
+              <BrutalistText size={24} bold mono>
+                {freeRunGamesRemaining}
+              </BrutalistText>
+              <BrutalistText size={11} mono muted style={styles.gamesRemainingText}>
+                {freeRunGamesRemaining === 1 ? 'game' : 'games'} available today.{'\n'}
+                Watch an ad when you run out to get more.
+              </BrutalistText>
+            </View>
+          )}
         </Animated.View>
       </ScrollView>
 
@@ -397,5 +410,19 @@ const styles = StyleSheet.create({
   hint: {
     textAlign: 'center',
     marginTop: 12,
+  },
+  gamesRemainingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    gap: 16,
+  },
+  gamesRemainingText: {
+    flex: 1,
+    lineHeight: 16,
   },
 });

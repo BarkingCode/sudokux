@@ -4,10 +4,14 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 import { AD_UNIT_IDS } from '../config/ads';
+import { TIMING } from '../config/timing';
 import { logAdImpression } from '../services/facebookAnalytics';
+import { isWeb } from '../utils/platform';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('InterstitialAd');
 
 // Create ad instance at module level
 const interstitialAd = InterstitialAd.createForAdRequest(AD_UNIT_IDS.INTERSTITIAL);
@@ -30,24 +34,24 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
 
   // Load interstitial ad
   const loadAd = useCallback(() => {
-    if (isAdFree || Platform.OS === 'web') {
-      console.log('[useInterstitialAd] Skipping load - ad free or web');
+    if (isAdFree || isWeb()) {
+      log.debug('Skipping load - ad free or web');
       return;
     }
 
-    console.log('[useInterstitialAd] Loading interstitial ad...');
+    log.debug('Loading interstitial ad...');
     setIsReady(false);
     interstitialAd.load();
   }, [isAdFree]);
 
   // Set up event listeners and initial load
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (isWeb()) return;
 
     const loadedUnsub = interstitialAd.addAdEventListener(
       AdEventType.LOADED,
       () => {
-        console.log('[useInterstitialAd] Ad loaded successfully');
+        log.debug('Ad loaded successfully');
         setIsReady(true);
       }
     );
@@ -55,7 +59,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
     const openedUnsub = interstitialAd.addAdEventListener(
       AdEventType.OPENED,
       () => {
-        console.log('[useInterstitialAd] Ad opened - logging impression');
+        log.debug('Ad opened - logging impression');
         logAdImpression('interstitial');
       }
     );
@@ -72,7 +76,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
     const errorUnsub = interstitialAd.addAdEventListener(
       AdEventType.ERROR,
       (error) => {
-        console.log('[useInterstitialAd] Ad error:', error);
+        log.error('Ad error', { error });
         setIsReady(false);
       }
     );
@@ -91,7 +95,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
   // Show interstitial ad and wait for it to close
   const show = useCallback((): Promise<void> => {
     return new Promise((resolve) => {
-      if (isAdFree || Platform.OS === 'web' || !isReady) {
+      if (isAdFree || isWeb() || !isReady) {
         resolve();
         return;
       }
@@ -115,14 +119,14 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
 
       // Timeout to ensure we always resolve
       const timeout = setTimeout(() => {
-        console.log('[useInterstitialAd] Show timeout - resolving');
+        log.debug('Show timeout - resolving');
         safeResolve();
-      }, 30000);
+      }, TIMING.AD_TIMEOUTS.SHOW);
 
       closeListener = interstitialAd.addAdEventListener(
         AdEventType.CLOSED,
         () => {
-          console.log('[useInterstitialAd] Ad closed');
+          log.debug('Ad closed');
           clearTimeout(timeout);
           safeResolve();
         }
@@ -131,7 +135,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
       errorListener = interstitialAd.addAdEventListener(
         AdEventType.ERROR,
         (error) => {
-          console.log('[useInterstitialAd] Show error:', error);
+          log.error('Show error', { error });
           clearTimeout(timeout);
           safeResolve();
         }
@@ -140,7 +144,7 @@ export const useInterstitialAd = ({ isAdFree }: UseInterstitialAdOptions): UseIn
       try {
         interstitialAd.show();
       } catch (error) {
-        console.log('[useInterstitialAd] Error showing ad:', error);
+        log.error('Error showing ad', { error });
         clearTimeout(timeout);
         safeResolve();
       }

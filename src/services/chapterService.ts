@@ -41,6 +41,8 @@ export interface ChapterInProgress {
   notes: Record<string, number[]>;
   savedAt: string;
   history?: string[]; // Undo history (optional for backwards compatibility)
+  isHelperUnlocked?: boolean; // Whether helper was unlocked for this game
+  isHelperActive?: boolean; // Whether helper is currently active
 }
 
 class ChapterService {

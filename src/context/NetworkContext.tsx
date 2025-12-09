@@ -6,6 +6,10 @@
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as Network from 'expo-network';
+import { TIMING } from '../config/timing';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('Network');
 
 interface NetworkContextType {
   isOnline: boolean;
@@ -25,7 +29,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsOnline(state.isConnected ?? false);
       setIsInternetReachable(state.isInternetReachable ?? false);
     } catch (error) {
-      console.error('Error checking network state:', error);
+      log.error('Error checking network state', { error });
       // Assume online if we can't check (fail-open for gameplay)
       setIsOnline(true);
       setIsInternetReachable(true);
@@ -36,9 +40,9 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Check initial connection state
     checkConnection();
 
-    // Poll for network changes every 5 seconds
+    // Poll for network changes
     // expo-network doesn't have event listeners, so we poll
-    const interval = setInterval(checkConnection, 5000);
+    const interval = setInterval(checkConnection, TIMING.NETWORK.CHECK_INTERVAL);
 
     return () => clearInterval(interval);
   }, []);

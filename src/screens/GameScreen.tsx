@@ -30,6 +30,10 @@ import { GameModalsManager } from '../components/game/GameModalsManager';
 import { useGameModals, useUserId, useGameCompletion, getPuzzleDifficulty } from '../hooks';
 import { loadData, saveData, removeData, STORAGE_KEYS } from '../utils/storage';
 import { GameLimitModal } from '../components/GameLimitModal';
+import { formatTime } from '../utils/timeFormatters';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('GameScreen');
 
 // Keep-awake helper functions with safe fallbacks
 const activateKeepAwake = () => {
@@ -56,12 +60,6 @@ interface GameProgress {
   completedPuzzles: number[];
   chapterGamesCompleted: number;
 }
-
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
 
 export default function GameScreen() {
   const { colors, isDark } = useTheme();
@@ -312,9 +310,9 @@ export default function GameScreen() {
       logGameCompleted(gameState.difficulty);
       logChapterCompleted(puzzleNumber, 3); // Assuming 3 stars max for now
 
-      console.log('[GameScreen] Saved chapter completion and checked achievements');
+      log.debug('Saved chapter completion and checked achievements');
     } catch (error) {
-      console.error('[GameScreen] Failed to save chapter completion:', error);
+      log.error('Failed to save chapter completion', { error });
     }
   }, [isChapter, gameState, internalUserId, supabaseUserId, puzzleNumber]);
 
@@ -323,7 +321,7 @@ export default function GameScreen() {
     if (!isFreeRun || !gameState || !gameState.isComplete) return;
 
     if (!supabaseUserId) {
-      console.warn('[GameScreen] Cannot save free run: supabaseUserId not available', {
+      log.warn('Cannot save free run: supabaseUserId not available', {
         gridType: gameState.gridType,
         difficulty: gameState.difficulty,
       });
@@ -352,12 +350,12 @@ export default function GameScreen() {
       // Log Facebook analytics event
       logGameCompleted(gameState.difficulty);
 
-      console.log('[GameScreen] Saved free run completion and checked achievements', {
+      log.debug('Saved free run completion and checked achievements', {
         gridType: gameState.gridType,
         difficulty: gameState.difficulty,
       });
     } catch (error) {
-      console.error('[GameScreen] Failed to save free run completion:', error);
+      log.error('Failed to save free run completion', { error });
     }
   }, [isFreeRun, gameState, supabaseUserId]);
 
@@ -391,7 +389,7 @@ export default function GameScreen() {
     try {
       await showChapterAd();
     } catch (err) {
-      console.log('[GameScreen] Ad error:', err);
+      log.error('Ad error', { error: err });
     }
 
     modals.closeChapterModal();
@@ -436,7 +434,7 @@ export default function GameScreen() {
       try {
         await showChapterAd();
       } catch (err) {
-        console.log('[GameScreen] Ad error:', err);
+        log.error('Ad error', { error: err });
       }
     }
     modals.closeChapterModal();
@@ -445,6 +443,11 @@ export default function GameScreen() {
 
   // Handle free run play again
   const handleFreeRunPlayAgain = useCallback(async () => {
+    log.debug('handleFreeRunPlayAgain called', {
+      hasGameState: !!gameState,
+      isAtFreeRunLimit,
+    });
+
     if (!gameState) return;
 
     // Save current game's parameters before clearing
@@ -460,22 +463,21 @@ export default function GameScreen() {
     modals.closeFreeRunModal();
 
     // Check for daily reset before checking limit
-    checkAndResetDaily();
+    const didReset = checkAndResetDaily();
+    log.debug('handleFreeRunPlayAgain: daily reset check', { didReset });
 
-    // Check if user has games remaining
-    if (isAtFreeRunLimit) {
-      setShowGameLimitModal(true);
-      return;
-    }
-
-    // Consume a game from the session
+    // Consume a game from the session (uses ref for accurate sync check)
+    // This replaces the isAtFreeRunLimit check which uses stale React state
     const canPlay = consumeFreeRunGame();
+    log.debug('handleFreeRunPlayAgain: consumeFreeRunGame result', { canPlay });
     if (!canPlay) {
+      log.debug('handleFreeRunPlayAgain: at limit, showing modal');
       setShowGameLimitModal(true);
       return;
     }
 
     // Start a new game with the same difficulty and grid type
+    log.debug('handleFreeRunPlayAgain: starting new game', { currentDifficulty, currentGridType });
     startNewGame(currentDifficulty, currentGridType);
   }, [gameState, modals, saveFreeRunCompletion, startNewGame, checkAndResetDaily, isAtFreeRunLimit, consumeFreeRunGame]);
 
@@ -492,12 +494,19 @@ export default function GameScreen() {
 
   // Handle unlock from GameLimitModal (after watching ad in play again flow)
   const handleGameLimitUnlocked = useCallback(() => {
+    log.debug('handleGameLimitUnlocked called', {
+      hasGameState: !!gameState,
+      difficulty: gameState?.difficulty,
+      gridType: gameState?.gridType,
+    });
+
     if (!gameState) return;
 
     setShowGameLimitModal(false);
 
     // After watching ad, games are already added by the ad context
     // Start a new game with the same settings
+    log.debug('handleGameLimitUnlocked: starting new game');
     startNewGame(gameState.difficulty, gameState.gridType);
   }, [gameState, startNewGame]);
 

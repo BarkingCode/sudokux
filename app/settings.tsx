@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
 import { X, Check, Pencil } from 'lucide-react-native';
 import { BrutalistText } from '../src/components/BrutalistText';
+import { BannerAd } from '../src/components/BannerAd';
 import { useTheme } from '../src/context/ThemeContext';
 import { notificationService, NotificationPreferences } from '../src/services/notificationService';
 import { loadData, STORAGE_KEYS } from '../src/utils/storage';
@@ -388,6 +389,9 @@ export default function SettingsScreen() {
           </View>
         </Animated.View>
       </ScrollView>
+
+      {/* Banner Ad */}
+      <BannerAd />
     </SafeAreaView>
   );
 }

@@ -9,6 +9,7 @@ import { AchievementToast } from '../components/AchievementToast';
 import { Confetti } from '../components/Confetti';
 import { getAchievementById, type AchievementDefinition, type AchievementId } from '../data/achievements';
 import { achievementEvents } from '../services/achievementEvents';
+import { TIMING } from '../config/timing';
 
 // Milestone achievements trigger confetti animation
 const MILESTONE_ACHIEVEMENTS: AchievementId[] = [
@@ -82,7 +83,7 @@ export const AchievementProvider: React.FC<AchievementProviderProps> = ({ childr
     // Show next in queue after a small delay
     setTimeout(() => {
       showNext();
-    }, 300);
+    }, TIMING.ACHIEVEMENTS.QUEUE_DELAY);
   }, [showNext]);
 
   const handleConfettiComplete = useCallback(() => {

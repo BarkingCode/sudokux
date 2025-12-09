@@ -3,10 +3,13 @@
  * Tracks separate counters for Chapters (interstitial) and Free Run (rewarded).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { loadData, saveData } from '../utils/storage';
 import { INTERSTITIAL_MIN_GAMES, INTERSTITIAL_MAX_GAMES, FREERUN_GAMES_PER_SESSION } from '../config/ads';
 import { getLocalDateString } from '../utils/dateUtils';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('AdSession');
 
 const STORAGE_KEY_SESSION = 'sudoku_ad_session';
 
@@ -54,44 +57,49 @@ const createInitialSession = (): AdSession => ({
  */
 export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
   const [session, setSession] = useState<AdSession>(createInitialSession());
+  // Ref for synchronous state access (prevents race conditions)
+  const sessionRef = useRef<AdSession>(createInitialSession());
 
   // Load session on mount
   useEffect(() => {
     loadData<AdSession>(STORAGE_KEY_SESSION).then((saved) => {
       if (saved && typeof saved.nextInterstitialThreshold === 'number') {
+        sessionRef.current = saved;
         setSession(saved);
       }
     });
   }, []);
 
-  // Save session when it changes
-  useEffect(() => {
-    saveData(STORAGE_KEY_SESSION, session);
-  }, [session]);
+  // Helper to update session state and ref atomically, with persistence
+  const updateSession = useCallback((updater: (prev: AdSession) => AdSession) => {
+    setSession(prev => {
+      const next = updater(prev);
+      sessionRef.current = next;
+      saveData(STORAGE_KEY_SESSION, next);
+      return next;
+    });
+  }, []);
 
   // ============================================
   // CHAPTERS - Interstitial Ads
   // ============================================
 
   const incrementChapterCount = useCallback((): number => {
-    let newCount = 0;
-    setSession((prev) => {
-      newCount = prev.chapterGamesSinceLastAd + 1;
-      return {
-        ...prev,
-        chapterGamesSinceLastAd: newCount,
-      };
-    });
-    return session.chapterGamesSinceLastAd + 1;
-  }, [session.chapterGamesSinceLastAd]);
+    const newCount = sessionRef.current.chapterGamesSinceLastAd + 1;
+    updateSession((prev) => ({
+      ...prev,
+      chapterGamesSinceLastAd: newCount,
+    }));
+    return newCount;
+  }, [updateSession]);
 
   const resetChapterCount = useCallback(() => {
-    setSession((prev) => ({
+    updateSession((prev) => ({
       ...prev,
       chapterGamesSinceLastAd: 0,
       nextInterstitialThreshold: generateNextInterstitialThreshold(),
     }));
-  }, []);
+  }, [updateSession]);
 
   const shouldShowInterstitial = useCallback((): boolean => {
     return session.chapterGamesSinceLastAd + 1 >= session.nextInterstitialThreshold;
@@ -104,32 +112,52 @@ export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
   const isAtFreeRunLimit = session.freeRunGamesRemaining <= 0;
 
   // Consume a Free Run game (returns true if allowed to play)
+  // Uses ref for synchronous check to prevent race conditions
   const consumeFreeRunGame = useCallback((): boolean => {
-    if (session.freeRunGamesRemaining <= 0) {
+    const currentRemaining = sessionRef.current.freeRunGamesRemaining;
+    log.debug('consumeFreeRunGame called', { currentRemaining });
+
+    if (currentRemaining <= 0) {
+      log.debug('consumeFreeRunGame: at limit, returning false');
       return false;
     }
 
-    setSession((prev) => ({
+    const newRemaining = currentRemaining - 1;
+    updateSession((prev) => ({
       ...prev,
-      freeRunGamesRemaining: prev.freeRunGamesRemaining - 1,
+      freeRunGamesRemaining: newRemaining,
     }));
 
+    log.debug('consumeFreeRunGame: consumed', { remaining: newRemaining });
     return true;
-  }, [session.freeRunGamesRemaining]);
+  }, [updateSession]);
 
   // Add games after watching rewarded ad
   const addFreeRunGames = useCallback(() => {
-    setSession((prev) => ({
+    const currentRemaining = sessionRef.current.freeRunGamesRemaining;
+    const newRemaining = currentRemaining + FREERUN_GAMES_PER_SESSION;
+    log.debug('addFreeRunGames called', {
+      before: currentRemaining,
+      adding: FREERUN_GAMES_PER_SESSION,
+      after: newRemaining,
+    });
+
+    updateSession((prev) => ({
       ...prev,
-      freeRunGamesRemaining: prev.freeRunGamesRemaining + FREERUN_GAMES_PER_SESSION,
+      freeRunGamesRemaining: newRemaining,
     }));
-  }, []);
+  }, [updateSession]);
 
   // Check if we need to reset Free Run games for a new day (midnight reset)
   const checkAndResetDaily = useCallback((): boolean => {
     const today = getLocalDateString();
-    if (session.lastFreeRunResetDate !== today) {
-      setSession((prev) => ({
+    const lastReset = sessionRef.current.lastFreeRunResetDate;
+    log.debug('checkAndResetDaily', { today, lastReset });
+
+    if (lastReset !== today) {
+      log.debug('Daily reset triggered', { resettingTo: FREERUN_GAMES_PER_SESSION });
+
+      updateSession((prev) => ({
         ...prev,
         freeRunGamesRemaining: FREERUN_GAMES_PER_SESSION,
         lastFreeRunResetDate: today,
@@ -137,7 +165,7 @@ export const useAdSession = (isAdFree: boolean): UseAdSessionReturn => {
       return true; // Did reset
     }
     return false; // No reset needed
-  }, [session.lastFreeRunResetDate]);
+  }, [updateSession]);
 
   // Check for daily reset on mount
   useEffect(() => {

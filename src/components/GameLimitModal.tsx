@@ -9,6 +9,9 @@ import { BrutalistText } from './BrutalistText';
 import { BrutalistButton } from './BrutalistButton';
 import { useTheme } from '../context/ThemeContext';
 import { useAds } from '../context/AdContext';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('GameLimitModal');
 
 interface GameLimitModalProps {
   visible: boolean;
@@ -26,14 +29,22 @@ export const GameLimitModal: React.FC<GameLimitModalProps> = ({
   const [isWatching, setIsWatching] = useState(false);
 
   const handleWatchAd = async () => {
+    log.debug('handleWatchAd called', {
+      freeRunGamesRemaining,
+      isRewardedAdReady,
+    });
     setIsWatching(true);
     try {
       const success = await showRewardedAd();
+      log.debug('showRewardedAd returned', { success });
       if (success) {
+        log.debug('Closing modal and triggering onUnlocked');
+        // Close the modal first, then trigger the unlock callback
+        onClose();
         onUnlocked();
       }
     } catch (error) {
-      console.log('[GameLimitModal] Error showing ad:', error);
+      log.error('Error showing ad', { error });
     } finally {
       setIsWatching(false);
     }

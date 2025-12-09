@@ -11,11 +11,15 @@
  */
 
 import React, { createContext, useContext, useCallback, useState, useEffect, useRef } from 'react';
-import { Platform, AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAdSession } from '../hooks/useAdSession';
 import { useInterstitialAd } from '../hooks/useInterstitialAd';
 import { useRewardedAd } from '../hooks/useRewardedAd';
 import { useHelperRewardedAd } from '../hooks/useHelperRewardedAd';
+import { isWeb } from '../utils/platform';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger('AdContext');
 
 interface AdContextType {
   isAdFree: boolean;
@@ -66,6 +70,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Rewarded ad (for Free Run) - grant games when reward earned
   const handleRewardEarned = useCallback(() => {
+    log.debug('handleRewardEarned callback triggered - calling addFreeRunGames');
     addFreeRunGames();
   }, [addFreeRunGames]);
 
@@ -90,16 +95,15 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Called when Chapter puzzle is completed - may show interstitial
   const onChapterComplete = useCallback(async (): Promise<void> => {
-    console.log('[AdContext] onChapterComplete called', {
+    log.debug('onChapterComplete called', {
       isAdFree,
-      platform: Platform.OS,
       chapterGamesSinceLastAd: session.chapterGamesSinceLastAd,
       nextInterstitialThreshold: session.nextInterstitialThreshold,
       isInterstitialAdReady: interstitialAd.isReady,
     });
 
-    if (isAdFree || Platform.OS === 'web') {
-      console.log('[AdContext] Skipping ad - ad free or web');
+    if (isAdFree || isWeb()) {
+      log.debug('Skipping ad - ad free or web');
       return;
     }
 
@@ -107,11 +111,11 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     incrementChapterCount();
 
     if (willShowAd) {
-      console.log('[AdContext] Showing interstitial ad');
+      log.debug('Showing interstitial ad');
       resetChapterCount();
       await interstitialAd.show();
     } else {
-      console.log('[AdContext] Not showing ad yet, threshold:', session.nextInterstitialThreshold);
+      log.debug('Not showing ad yet', { threshold: session.nextInterstitialThreshold });
     }
   }, [
     isAdFree,
