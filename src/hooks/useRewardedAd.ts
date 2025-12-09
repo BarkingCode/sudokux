@@ -4,9 +4,9 @@
  *
  * Production note: Multi-part ads (e.g., "ad 2 of 2") may have delayed CLOSED events.
  * We handle this by:
- * 1. Using a longer show timeout (60s) to accommodate multi-part ads
- * 2. Granting reward immediately when EARNED_REWARD fires (not waiting for CLOSED)
- * 3. Using CLOSED only to trigger ad reload and cleanup
+ * 1. Using a longer show timeout (90s in production) to accommodate multi-part ads
+ * 2. Granting reward immediately when EARNED_REWARD fires (so user gets reward even if app crashes)
+ * 3. Only resolving the promise when CLOSED fires (so UI doesn't update while ad overlay is visible)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,9 +40,11 @@ export interface UseRewardedAdReturn {
  * Manages rewarded ad loading and display.
  * Tracks reward earned state and automatically preloads next ad.
  *
- * Key behavior: Reward is granted immediately when EARNED_REWARD fires,
- * not when CLOSED fires. This ensures users get their reward even if
- * the ad close sequence is slow or interrupted.
+ * Key behavior:
+ * - Reward callback (onRewardEarned) fires immediately when EARNED_REWARD event occurs
+ *   (ensures user gets reward even if ad close is slow/interrupted)
+ * - Promise resolves only when CLOSED event fires
+ *   (ensures UI doesn't try to update while ad overlay is still visible)
  */
 export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions): UseRewardedAdReturn => {
   const [isReady, setIsReady] = useState(false);
@@ -78,17 +80,18 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
   }, []);
 
   // Grant reward immediately - called when EARNED_REWARD fires
-  // This ensures user gets reward even if CLOSED is delayed
+  // This ensures user gets reward even if CLOSED is delayed or app crashes
+  // NOTE: This only calls the callback, it does NOT resolve the promise
   const grantRewardIfNotAlready = useCallback(() => {
     if (!rewardGrantedRef.current && rewardEarnedRef.current) {
       rewardGrantedRef.current = true;
-      log.debug('Granting reward immediately on EARNED_REWARD');
+      log.debug('Granting reward on EARNED_REWARD (callback only, not resolving promise yet)');
       onRewardEarned();
     }
   }, [onRewardEarned]);
 
   // Safe resolve that prevents double resolution
-  // Called when ad closes - resolves the promise but reward may already be granted
+  // Called when ad closes - resolves the promise so UI can update
   const safeResolve = useCallback((wasEarned: boolean) => {
     if (pendingResolverRef.current) {
       const resolver = pendingResolverRef.current;
@@ -96,7 +99,7 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
       isShowingRef.current = false;
       clearShowTimeout();
 
-      log.debug('Safe resolve called', { wasEarned, alreadyGranted: rewardGrantedRef.current });
+      log.debug('Safe resolve called (ad closed)', { wasEarned, alreadyGranted: rewardGrantedRef.current });
 
       // If reward was earned but not yet granted (shouldn't happen, but safety net)
       if (wasEarned && !rewardGrantedRef.current) {
@@ -155,8 +158,10 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
       }
     );
 
-    // CRITICAL: Grant reward immediately when EARNED_REWARD fires
-    // Don't wait for CLOSED - production ads may have delayed close events
+    // Grant reward immediately when EARNED_REWARD fires
+    // But we still wait for CLOSED to resolve the promise (so UI doesn't update while ad visible)
+    // However, if CLOSED doesn't fire within 5 seconds of EARNED_REWARD, force resolve
+    // (handles edge case where ad gets stuck)
     const earnedUnsub = rewardedAd.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       (reward) => {
@@ -169,6 +174,15 @@ export const useRewardedAd = ({ isAdFree, onRewardEarned }: UseRewardedAdOptions
 
         // Grant reward immediately - don't wait for CLOSED
         grantRewardIfNotAlready();
+
+        // Safety: If CLOSED doesn't fire within 5 seconds after EARNED_REWARD,
+        // force resolve the promise (handles stuck ad overlay edge case)
+        setTimeout(() => {
+          if (pendingResolverRef.current && rewardEarnedRef.current) {
+            log.debug('Force resolving after EARNED_REWARD timeout - CLOSED may not have fired');
+            safeResolve(true);
+          }
+        }, 5000);
       }
     );
 

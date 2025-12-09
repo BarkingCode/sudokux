@@ -137,8 +137,9 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
       }
     );
 
-    // CRITICAL: Resolve immediately when EARNED_REWARD fires
-    // Don't wait for CLOSED - production ads may have delayed close events
+    // Record reward earned when EARNED_REWARD fires
+    // But wait for CLOSED to resolve the promise (so UI doesn't update while ad visible)
+    // However, if CLOSED doesn't fire within 5 seconds of EARNED_REWARD, force resolve
     const earnedUnsub = helperRewardedAd.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       (reward) => {
@@ -150,8 +151,14 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
         });
         rewardEarnedRef.current = true;
 
-        // Resolve immediately - don't wait for CLOSED
-        safeResolve(true);
+        // Safety: If CLOSED doesn't fire within 5 seconds after EARNED_REWARD,
+        // force resolve the promise (handles stuck ad overlay edge case)
+        setTimeout(() => {
+          if (pendingResolverRef.current && !resolvedRef.current && rewardEarnedRef.current) {
+            log.debug('Force resolving after EARNED_REWARD timeout - CLOSED may not have fired');
+            safeResolve(true);
+          }
+        }, 5000);
       }
     );
 
