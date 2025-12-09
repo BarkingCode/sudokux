@@ -2,17 +2,26 @@
  * Hook for managing helper-specific rewarded ad lifecycle.
  * Used for unlocking the Smart Possibility Helper feature.
  * Separate from the main rewarded ad to avoid granting free-run games.
+ *
+ * Production note: Multi-part ads (e.g., "ad 2 of 2") may have delayed CLOSED events.
+ * We handle this by:
+ * 1. Using a longer show timeout (90s in production) to accommodate multi-part ads
+ * 2. Resolving with earned status immediately when EARNED_REWARD fires
+ * 3. Using CLOSED only to trigger ad reload and cleanup
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RewardedAd, AdEventType, RewardedAdEventType } from 'react-native-google-mobile-ads';
 import { AD_UNIT_IDS } from '../config/ads';
-import { getAdLoadTimeout, TIMING } from '../config/timing';
+import { getAdLoadTimeout } from '../config/timing';
 import { logAdImpression } from '../services/facebookAnalytics';
 import { isWeb } from '../utils/platform';
 import { createScopedLogger } from '../utils/logger';
 
 const log = createScopedLogger('HelperRewardedAd');
+
+// Longer timeout for production ads (multi-part ads can take 45-60 seconds)
+const AD_SHOW_TIMEOUT = __DEV__ ? 30000 : 90000;
 
 // Create ad instance at module level - separate from main rewarded ad
 const helperRewardedAd = RewardedAd.createForAdRequest(AD_UNIT_IDS.HELPER_REWARDED);
@@ -30,6 +39,10 @@ export interface UseHelperRewardedAdReturn {
 /**
  * Manages helper rewarded ad loading and display.
  * Does NOT grant free-run games - only used for unlocking helper feature.
+ *
+ * Key behavior: Promise resolves immediately when EARNED_REWARD fires,
+ * not when CLOSED fires. This ensures users get their reward even if
+ * the ad close sequence is slow or interrupted.
  */
 export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): UseHelperRewardedAdReturn => {
   const [isReady, setIsReady] = useState(false);
@@ -37,15 +50,16 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
 
   // Use refs instead of module-level state to prevent race conditions
   const rewardEarnedRef = useRef(false);
+  const resolvedRef = useRef(false); // Track if we've already resolved
   const pendingResolverRef = useRef<((value: boolean) => void) | null>(null);
-  const showTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isShowingRef = useRef(false);
 
   // Debug log on mount
   useEffect(() => {
     log.debug('Hook mounted', { isAdFree });
-  }, []);
+  }, [isAdFree]);
 
   // Clear loading timeout
   const clearLoadTimeout = useCallback(() => {
@@ -65,7 +79,8 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
 
   // Safe resolve that prevents double resolution
   const safeResolve = useCallback((wasEarned: boolean) => {
-    if (pendingResolverRef.current) {
+    if (pendingResolverRef.current && !resolvedRef.current) {
+      resolvedRef.current = true;
       const resolver = pendingResolverRef.current;
       pendingResolverRef.current = null;
       isShowingRef.current = false;
@@ -122,11 +137,21 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
       }
     );
 
+    // CRITICAL: Resolve immediately when EARNED_REWARD fires
+    // Don't wait for CLOSED - production ads may have delayed close events
     const earnedUnsub = helperRewardedAd.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
-      () => {
-        log.debug('EARNED_REWARD event fired');
+      (reward) => {
+        log.debug('EARNED_REWARD event fired', {
+          type: reward?.type,
+          amount: reward?.amount,
+          hasResolver: !!pendingResolverRef.current,
+          alreadyResolved: resolvedRef.current,
+        });
         rewardEarnedRef.current = true;
+
+        // Resolve immediately - don't wait for CLOSED
+        safeResolve(true);
       }
     );
 
@@ -136,15 +161,19 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
         const wasEarned = rewardEarnedRef.current;
         log.debug('CLOSED event fired', {
           wasEarned,
-          hasResolver: !!pendingResolverRef.current
+          hasResolver: !!pendingResolverRef.current,
+          alreadyResolved: resolvedRef.current,
         });
         setIsReady(false);
 
-        // Resolve the pending promise if there is one
-        safeResolve(wasEarned);
+        // Resolve if not already resolved (e.g., user closed without earning)
+        if (!resolvedRef.current) {
+          safeResolve(wasEarned);
+        }
 
-        // Reset reward state for next show
+        // Reset state for next show
         rewardEarnedRef.current = false;
+        resolvedRef.current = false;
 
         // Preload next ad
         loadAd();
@@ -153,8 +182,12 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
 
     const errorUnsub = helperRewardedAd.addAdEventListener(
       AdEventType.ERROR,
-      (error) => {
-        log.error('Ad error', { error });
+      (error: Error & { code?: string; domain?: string }) => {
+        log.error('Ad error', {
+          message: error?.message,
+          code: error?.code,
+          domain: error?.domain,
+        });
         clearLoadTimeout();
         setIsReady(false);
         setIsLoading(false);
@@ -219,16 +252,25 @@ export const useHelperRewardedAd = ({ isAdFree }: UseHelperRewardedAdOptions): U
 
       // Reset state for this show attempt
       rewardEarnedRef.current = false;
+      resolvedRef.current = false;
       isShowingRef.current = true;
 
       // Store the resolver
       pendingResolverRef.current = resolve;
 
-      // Timeout to prevent infinite waiting
+      // Longer timeout for production multi-part ads
       showTimeoutRef.current = setTimeout(() => {
-        log.debug('Show timeout - resolving false');
-        safeResolve(false);
-      }, TIMING.AD_TIMEOUTS.SHOW);
+        log.debug('Show timeout reached', {
+          timeoutMs: AD_SHOW_TIMEOUT,
+          wasEarned: rewardEarnedRef.current,
+          alreadyResolved: resolvedRef.current,
+        });
+        // If reward was earned, resolve true even on timeout
+        // (ad just took too long to close)
+        if (!resolvedRef.current) {
+          safeResolve(rewardEarnedRef.current);
+        }
+      }, AD_SHOW_TIMEOUT);
 
       try {
         log.debug('Showing ad...');
