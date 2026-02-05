@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
-import { ThemeProvider } from '../src/context/ThemeContext';
+import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { NetworkProvider } from '../src/context/NetworkContext';
 import { DailyStatusProvider } from '../src/context/DailyStatusContext';
 import { GameProvider } from '../src/context/GameContext';
@@ -69,8 +69,9 @@ function NotificationHandler() {
         if (supabaseUser) {
           console.log('[Identity] Supabase user synced');
 
-          // Initialize notifications
-          await notificationService.initialize(supabaseUser.id);
+          // Initialize notifications using internal ID, then sync reminder schedule
+          await notificationService.initialize(updatedIdentity.id);
+          await notificationService.getPreferences(updatedIdentity.id);
 
           // Sync any queued offline achievements
           await statsService.syncOfflineQueue(supabaseUser.id);
@@ -117,6 +118,18 @@ function NotificationHandler() {
   return null;
 }
 
+function ThemedApp() {
+  const { colors, isDark } = useTheme();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <NotificationHandler />
+      <Stack screenOptions={{ headerShown: false }} />
+    </View>
+  );
+}
+
 function RootLayout() {
   return (
     <ErrorBoundary>
@@ -126,11 +139,7 @@ function RootLayout() {
             <AchievementProvider>
               <AdProvider>
                 <GameProvider>
-                  <View style={{ flex: 1 }}>
-                    <StatusBar style="auto" />
-                    <NotificationHandler />
-                    <Stack screenOptions={{ headerShown: false }} />
-                  </View>
+                  <ThemedApp />
                 </GameProvider>
               </AdProvider>
             </AchievementProvider>

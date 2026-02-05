@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { Appearance } from 'react-native';
 import { loadData, saveData, STORAGE_KEYS } from '../utils/storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -59,30 +59,41 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const systemScheme = useColorScheme();
+  const initialScheme = Appearance.getColorScheme();
+  console.log('[Theme] Initial Appearance.getColorScheme():', initialScheme);
+
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [isDark, setIsDark] = useState(systemScheme === 'dark');
+  const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(
+    () => initialScheme || 'light'
+  );
 
   useEffect(() => {
     loadData<ThemeMode>(STORAGE_KEYS.SETTINGS).then((savedMode) => {
-      if (savedMode) {
+      console.log('[Theme] Loaded saved mode from storage:', savedMode);
+      if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
         setModeState(savedMode);
       }
     });
   }, []);
 
+  // Explicitly listen for OS appearance changes
   useEffect(() => {
-    if (mode === 'system') {
-      setIsDark(systemScheme === 'dark');
-    } else {
-      setIsDark(mode === 'dark');
-    }
-  }, [mode, systemScheme]);
+    console.log('[Theme] Subscribing to Appearance change listener');
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      console.log('[Theme] Appearance changed! New colorScheme:', colorScheme);
+      setSystemScheme(colorScheme || 'light');
+    });
+    return () => subscription.remove();
+  }, []);
 
-  const setMode = (newMode: ThemeMode) => {
+  const isDark = mode === 'system' ? systemScheme === 'dark' : mode === 'dark';
+  console.log('[Theme] Resolved → mode:', mode, '| systemScheme:', systemScheme, '| isDark:', isDark);
+
+  const setMode = useCallback((newMode: ThemeMode) => {
+    console.log('[Theme] setMode called with:', newMode);
     setModeState(newMode);
     saveData(STORAGE_KEYS.SETTINGS, newMode);
-  };
+  }, []);
 
   const colors = isDark ? BRUTALIST_DARK : BRUTALIST_LIGHT;
 

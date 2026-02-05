@@ -6,7 +6,7 @@ export default {
     version: '1.0.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'light',
+    userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     splash: {
       image: './assets/splash-icon.png',
@@ -18,6 +18,7 @@ export default {
       bundleIdentifier: 'com.artticfox.sudokux',
       usesAppleSignIn: false,
       infoPlist: {
+        UIUserInterfaceStyle: 'Automatic',
         UIBackgroundModes: ['fetch', 'remote-notification'],
         GADApplicationIdentifier:
           process.env.EXPO_PUBLIC_ADMOB_APP_ID_IOS ||
