@@ -3,11 +3,34 @@
  * Rewarded ad lifecycle with EARNED_REWARD handling.
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { useRewardedAd } from '../../src/hooks/useRewardedAd';
-import { RewardedAd, AdEventType, RewardedAdEventType } from 'react-native-google-mobile-ads';
+// Shared mock ad — variables starting with 'mock' are allowed in jest.mock factories
+const mockEventListeners = new Map<string, Function>();
+const mockAd = {
+  load: jest.fn(),
+  show: jest.fn(),
+  addAdEventListener: jest.fn((eventType: string, callback: Function) => {
+    mockEventListeners.set(eventType, callback);
+    return jest.fn();
+  }),
+};
 
-// Mock platform check
+jest.mock('react-native-google-mobile-ads', () => ({
+  RewardedAd: {
+    createForAdRequest: jest.fn(() => mockAd),
+  },
+  AdEventType: {
+    LOADED: 'loaded',
+    ERROR: 'error',
+    CLOSED: 'closed',
+    OPENED: 'opened',
+  },
+  RewardedAdEventType: {
+    LOADED: 'loaded',
+    EARNED_REWARD: 'earned_reward',
+  },
+  TestIds: { REWARDED: 'test-rewarded' },
+}));
+
 jest.mock('../../src/utils/platform', () => ({
   isWeb: jest.fn(() => false),
 }));
@@ -16,34 +39,35 @@ jest.mock('../../src/services/facebookAnalytics', () => ({
   logAdImpression: jest.fn(),
 }));
 
+jest.mock('../../src/config/timing', () => ({
+  getAdLoadTimeout: jest.fn(() => 10000),
+}));
+
+jest.mock('../../src/utils/logger', () => ({
+  createScopedLogger: jest.fn(() => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  })),
+}));
+
+import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { useRewardedAd } from '../../src/hooks/useRewardedAd';
+import { AdEventType, RewardedAdEventType } from 'react-native-google-mobile-ads';
 import { isWeb } from '../../src/utils/platform';
-import { logAdImpression } from '../../src/services/facebookAnalytics';
 
 const mockIsWeb = isWeb as jest.MockedFunction<typeof isWeb>;
 
 describe('useRewardedAd', () => {
-  let mockAd: any;
-  let eventListeners: Map<string, Function>;
   let onRewardEarned: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockIsWeb.mockReturnValue(false);
-    eventListeners = new Map();
+    mockEventListeners.clear();
     onRewardEarned = jest.fn();
-
-    // Mock ad instance
-    mockAd = {
-      load: jest.fn(),
-      show: jest.fn(),
-      addAdEventListener: jest.fn((eventType: string, callback: Function) => {
-        eventListeners.set(eventType, callback);
-        return jest.fn(); // Return unsubscribe function
-      }),
-    };
-
-    (RewardedAd.createForAdRequest as jest.Mock) = jest.fn(() => mockAd);
   });
 
   afterEach(() => {
@@ -91,11 +115,11 @@ describe('useRewardedAd', () => {
       const { result } = renderHook(() => useRewardedAd({ isAdFree: false, onRewardEarned }));
 
       await waitFor(() => {
-        expect(eventListeners.has(RewardedAdEventType.LOADED)).toBe(true);
+        expect(mockEventListeners.has(RewardedAdEventType.LOADED)).toBe(true);
       });
 
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -113,7 +137,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -127,7 +151,7 @@ describe('useRewardedAd', () => {
 
       // Fire EARNED_REWARD before CLOSED
       act(() => {
-        eventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
+        mockEventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
       });
 
       // Callback should fire immediately
@@ -137,7 +161,7 @@ describe('useRewardedAd', () => {
 
       // Close ad
       act(() => {
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(AdEventType.CLOSED)!();
       });
 
       await showPromise;
@@ -151,7 +175,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -165,7 +189,7 @@ describe('useRewardedAd', () => {
 
       // Fire EARNED_REWARD
       act(() => {
-        eventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
+        mockEventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
       });
 
       // Don't fire CLOSED - simulate stuck ad
@@ -190,7 +214,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -204,8 +228,8 @@ describe('useRewardedAd', () => {
 
       // Earn reward and close
       act(() => {
-        eventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
+        mockEventListeners.get(AdEventType.CLOSED)!();
       });
 
       const earned = await showPromise;
@@ -217,7 +241,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -230,7 +254,7 @@ describe('useRewardedAd', () => {
       });
 
       act(() => {
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(AdEventType.CLOSED)!();
       });
 
       const earned = await showPromise;
@@ -247,7 +271,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -257,7 +281,7 @@ describe('useRewardedAd', () => {
       // Show and close
       await act(async () => {
         const showPromise = result.current.show();
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(AdEventType.CLOSED)!();
         await showPromise;
       });
 
@@ -305,7 +329,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -326,8 +350,8 @@ describe('useRewardedAd', () => {
 
       // Complete first show
       act(() => {
-        eventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
+        mockEventListeners.get(AdEventType.CLOSED)!();
       });
 
       await showPromise1;
@@ -344,7 +368,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -357,7 +381,7 @@ describe('useRewardedAd', () => {
       });
 
       act(() => {
-        eventListeners.get(AdEventType.ERROR)!(new Error('Ad show failed'));
+        mockEventListeners.get(AdEventType.ERROR)!(new Error('Ad show failed'));
       });
 
       const earned = await showPromise;
@@ -372,7 +396,7 @@ describe('useRewardedAd', () => {
       });
 
       act(() => {
-        eventListeners.get(AdEventType.ERROR)!(new Error('Load failed'));
+        mockEventListeners.get(AdEventType.ERROR)!(new Error('Load failed'));
       });
 
       await waitFor(() => {
@@ -390,7 +414,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -419,7 +443,7 @@ describe('useRewardedAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(RewardedAdEventType.LOADED)!();
+        mockEventListeners.get(RewardedAdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -432,7 +456,7 @@ describe('useRewardedAd', () => {
       });
 
       act(() => {
-        eventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
+        mockEventListeners.get(RewardedAdEventType.EARNED_REWARD)!({ type: 'coins', amount: 1 });
       });
 
       // Don't close, let it timeout

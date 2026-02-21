@@ -82,22 +82,14 @@ describe('dailyChallengeService', () => {
   // ============ getDifficultyForDate (tested indirectly) ============
   // Note: getDifficultyForDate is a private function, tested via getTodayChallenge fallback
 
-  describe('difficulty rotation (via fallback generation)', () => {
-    // We can test this by checking the generated fallback challenge
-    // when Supabase returns no data
-
+  describe('no fallback when Supabase has no challenge', () => {
     beforeEach(() => {
       mockSingle.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
     });
 
-    it('should generate fallback with correct difficulty based on day of week', async () => {
-      // This tests the fallback generation which uses getDifficultyForDate
+    it('should return null when no challenge exists in Supabase', async () => {
       const challenge = await getTodayChallenge();
-
-      expect(challenge).not.toBeNull();
-      expect(challenge!.difficulty).toBeDefined();
-      // The difficulty should be one of the valid options
-      expect(['easy', 'medium', 'hard', 'extreme', 'insane', 'inhuman']).toContain(challenge!.difficulty);
+      expect(challenge).toBeNull();
     });
   });
 
@@ -123,36 +115,18 @@ describe('dailyChallengeService', () => {
       expect(challenge!.difficulty).toBe('medium');
     });
 
-    it('should generate fallback when Supabase returns no data', async () => {
+    it('should return null when Supabase returns no data', async () => {
       mockSingle.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
 
       const challenge = await getTodayChallenge();
-
-      expect(challenge).not.toBeNull();
-      // Fallback ID is a deterministic UUID, check it's a valid UUID format
-      expect(challenge!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-      expect(challenge!.grid_type).toBe('9x9'); // Daily is always 9x9
+      expect(challenge).toBeNull();
     });
 
-    it('should generate fallback on Supabase error', async () => {
+    it('should return null on Supabase error', async () => {
       mockSingle.mockRejectedValue(new Error('Network error'));
 
       const challenge = await getTodayChallenge();
-
-      expect(challenge).not.toBeNull();
-      // Fallback ID is a deterministic UUID, check it's a valid UUID format
-      expect(challenge!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-    });
-
-    it('should return valid puzzle grid in fallback', async () => {
-      mockSingle.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
-
-      const challenge = await getTodayChallenge();
-
-      expect(challenge).not.toBeNull();
-      expect(challenge!.puzzle_grid).toBeDefined();
-      expect(challenge!.puzzle_grid.length).toBe(9);
-      expect(challenge!.solution_grid.length).toBe(9);
+      expect(challenge).toBeNull();
     });
   });
 

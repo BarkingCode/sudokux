@@ -3,11 +3,33 @@
  * Interstitial ad lifecycle and event handling.
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { useInterstitialAd } from '../../src/hooks/useInterstitialAd';
-import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+const mockEventListeners = new Map<string, Function>();
+const mockAd = {
+  load: jest.fn(),
+  show: jest.fn(),
+  addAdEventListener: jest.fn((eventType: string, callback: Function) => {
+    mockEventListeners.set(eventType, callback);
+    return jest.fn();
+  }),
+};
 
-// Mock platform check
+jest.mock('react-native-google-mobile-ads', () => ({
+  InterstitialAd: {
+    createForAdRequest: jest.fn(() => mockAd),
+  },
+  AdEventType: {
+    LOADED: 'loaded',
+    ERROR: 'error',
+    CLOSED: 'closed',
+    OPENED: 'opened',
+  },
+  RewardedAdEventType: {
+    LOADED: 'loaded',
+    EARNED_REWARD: 'earned_reward',
+  },
+  TestIds: { INTERSTITIAL: 'test-interstitial' },
+}));
+
 jest.mock('../../src/utils/platform', () => ({
   isWeb: jest.fn(() => false),
 }));
@@ -16,31 +38,32 @@ jest.mock('../../src/services/facebookAnalytics', () => ({
   logAdImpression: jest.fn(),
 }));
 
+jest.mock('../../src/config/timing', () => ({
+  getAdLoadTimeout: jest.fn(() => 10000),
+}));
+
+jest.mock('../../src/utils/logger', () => ({
+  createScopedLogger: jest.fn(() => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  })),
+}));
+
+import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { useInterstitialAd } from '../../src/hooks/useInterstitialAd';
+import { AdEventType } from 'react-native-google-mobile-ads';
 import { isWeb } from '../../src/utils/platform';
 import { logAdImpression } from '../../src/services/facebookAnalytics';
 
 const mockIsWeb = isWeb as jest.MockedFunction<typeof isWeb>;
 
 describe('useInterstitialAd', () => {
-  let mockAd: any;
-  let eventListeners: Map<string, Function>;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsWeb.mockReturnValue(false);
-    eventListeners = new Map();
-
-    // Mock ad instance
-    mockAd = {
-      load: jest.fn(),
-      show: jest.fn(),
-      addAdEventListener: jest.fn((eventType: string, callback: Function) => {
-        eventListeners.set(eventType, callback);
-        return jest.fn(); // Return unsubscribe function
-      }),
-    };
-
-    (InterstitialAd.createForAdRequest as jest.Mock) = jest.fn(() => mockAd);
+    mockEventListeners.clear();
   });
 
   // ============ Loading ============
@@ -76,11 +99,11 @@ describe('useInterstitialAd', () => {
       const { result } = renderHook(() => useInterstitialAd({ isAdFree: false }));
 
       await waitFor(() => {
-        expect(eventListeners.has(AdEventType.LOADED)).toBe(true);
+        expect(mockEventListeners.has(AdEventType.LOADED)).toBe(true);
       });
 
       act(() => {
-        const loadedCallback = eventListeners.get(AdEventType.LOADED)!;
+        const loadedCallback = mockEventListeners.get(AdEventType.LOADED)!;
         loadedCallback();
       });
 
@@ -94,11 +117,11 @@ describe('useInterstitialAd', () => {
 
       // First load the ad
       await waitFor(() => {
-        expect(eventListeners.has(AdEventType.LOADED)).toBe(true);
+        expect(mockEventListeners.has(AdEventType.LOADED)).toBe(true);
       });
 
       act(() => {
-        eventListeners.get(AdEventType.LOADED)!();
+        mockEventListeners.get(AdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -107,7 +130,7 @@ describe('useInterstitialAd', () => {
 
       // Then trigger error
       act(() => {
-        const errorCallback = eventListeners.get(AdEventType.ERROR)!;
+        const errorCallback = mockEventListeners.get(AdEventType.ERROR)!;
         errorCallback(new Error('Ad load failed'));
       });
 
@@ -168,11 +191,11 @@ describe('useInterstitialAd', () => {
       renderHook(() => useInterstitialAd({ isAdFree: false }));
 
       await waitFor(() => {
-        expect(eventListeners.has(AdEventType.OPENED)).toBe(true);
+        expect(mockEventListeners.has(AdEventType.OPENED)).toBe(true);
       });
 
       act(() => {
-        eventListeners.get(AdEventType.OPENED)!();
+        mockEventListeners.get(AdEventType.OPENED)!();
       });
 
       await waitFor(() => {
@@ -188,7 +211,7 @@ describe('useInterstitialAd', () => {
       });
 
       act(() => {
-        eventListeners.get(AdEventType.CLOSED)!();
+        mockEventListeners.get(AdEventType.CLOSED)!();
       });
 
       await waitFor(() => {
@@ -244,11 +267,11 @@ describe('useInterstitialAd', () => {
 
       // Load ad
       await waitFor(() => {
-        expect(eventListeners.has(AdEventType.LOADED)).toBe(true);
+        expect(mockEventListeners.has(AdEventType.LOADED)).toBe(true);
       });
 
       act(() => {
-        eventListeners.get(AdEventType.LOADED)!();
+        mockEventListeners.get(AdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -261,7 +284,7 @@ describe('useInterstitialAd', () => {
         
         // Simulate ad closing
         setTimeout(() => {
-          eventListeners.get(AdEventType.CLOSED)!();
+          mockEventListeners.get(AdEventType.CLOSED)!();
         }, 100);
 
         await showPromise;
@@ -275,7 +298,7 @@ describe('useInterstitialAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(AdEventType.LOADED)!();
+        mockEventListeners.get(AdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -288,7 +311,7 @@ describe('useInterstitialAd', () => {
         
         // Simulate immediate close
         setTimeout(() => {
-          eventListeners.get(AdEventType.CLOSED)!();
+          mockEventListeners.get(AdEventType.CLOSED)!();
         }, 10);
 
         await showPromise;
@@ -302,7 +325,7 @@ describe('useInterstitialAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(AdEventType.LOADED)!();
+        mockEventListeners.get(AdEventType.LOADED)!();
       });
 
       await waitFor(() => {
@@ -315,7 +338,7 @@ describe('useInterstitialAd', () => {
         
         // Simulate error during show
         setTimeout(() => {
-          eventListeners.get(AdEventType.ERROR)!(new Error('Show failed'));
+          mockEventListeners.get(AdEventType.ERROR)!(new Error('Show failed'));
         }, 10);
 
         await showPromise;
@@ -329,7 +352,7 @@ describe('useInterstitialAd', () => {
 
       // Load ad
       act(() => {
-        eventListeners.get(AdEventType.LOADED)!();
+        mockEventListeners.get(AdEventType.LOADED)!();
       });
 
       await waitFor(() => {

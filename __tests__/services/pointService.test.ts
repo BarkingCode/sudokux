@@ -282,6 +282,10 @@ describe('pointService', () => {
   // ============ getUserPointsRank ============
 
   describe('getUserPointsRank', () => {
+    beforeEach(() => {
+      (supabase as any).rpc = jest.fn();
+    });
+
     it('should return user rank and total players', async () => {
       (supabase.rpc as jest.Mock).mockResolvedValue({
         data: [{ rank: 42, total_players: 1000 }],

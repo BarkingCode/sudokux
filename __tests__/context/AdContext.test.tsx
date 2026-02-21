@@ -6,6 +6,14 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AppState } from 'react-native';
+
+// Ensure AppState.currentState is defined
+Object.defineProperty(AppState, 'currentState', {
+  value: 'active',
+  writable: true,
+  configurable: true,
+});
+
 import { AdProvider, useAds } from '../../src/context/AdContext';
 
 // Mock all dependencies

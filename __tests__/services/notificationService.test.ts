@@ -9,15 +9,16 @@ import * as Device from 'expo-device';
 import { supabase } from '../../src/lib/supabase';
 
 // Mock Device to control isDevice
+let mockIsDevice = true;
 jest.mock('expo-device', () => ({
-  isDevice: true,
+  get isDevice() { return mockIsDevice; },
   deviceName: 'Test Device',
 }));
 
 describe('notificationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (Device as any).isDevice = true;
+    mockIsDevice = true;
   });
 
   // ============ Permission Request Flow ============
@@ -97,7 +98,7 @@ describe('notificationService', () => {
     });
 
     it('should return null if not a physical device', async () => {
-      (Device as any).isDevice = false;
+      mockIsDevice = false;
 
       const token = await notificationService.initialize('user-123');
 
