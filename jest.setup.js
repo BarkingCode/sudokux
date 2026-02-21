@@ -3,6 +3,14 @@
  * Contains all necessary mocks for native modules and external services.
  */
 
+// Define __DEV__ for React Native
+global.__DEV__ = true;
+
+// Set required env vars
+process.env.EXPO_PUBLIC_PROJECT_ID = 'test-project-id';
+process.env.EXPO_PUBLIC_ADMOB_BANNER_IOS = 'test-banner-ios';
+process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID = 'test-banner-android';
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -39,8 +47,28 @@ jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   scheduleNotificationAsync: jest.fn(() => Promise.resolve('notification-id')),
   cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+  cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
   setBadgeCountAsync: jest.fn(() => Promise.resolve()),
   getBadgeCountAsync: jest.fn(() => Promise.resolve(0)),
+  getExpoPushTokenAsync: jest.fn(() => Promise.resolve({ data: 'ExponentPushToken[test]' })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationChannelAsync: jest.fn(() => Promise.resolve()),
+  SchedulableTriggerInputTypes: {
+    TIME_INTERVAL: 'timeInterval',
+    DATE: 'date',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    CALENDAR: 'calendar',
+  },
+  AndroidImportance: {
+    DEFAULT: 3,
+    HIGH: 4,
+    LOW: 2,
+    MAX: 5,
+    MIN: 1,
+    NONE: 0,
+  },
 }));
 
 // Mock expo-device
@@ -119,6 +147,7 @@ jest.mock('react-native-google-mobile-ads', () => ({
   },
   AdEventType: {
     LOADED: 'loaded',
+    OPENED: 'opened',
     ERROR: 'error',
     CLOSED: 'closed',
   },
@@ -133,9 +162,20 @@ jest.mock('react-native-google-mobile-ads', () => ({
   },
 }));
 
+// Mock expo-localization
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }]),
+  getCalendars: jest.fn(() => [{ calendar: 'gregory', timeZone: 'America/New_York' }]),
+  locale: 'en-US',
+  locales: ['en-US'],
+  timezone: 'America/New_York',
+  isRTL: false,
+}));
+
 // Mock Supabase client
 jest.mock('./src/lib/supabase', () => ({
   supabase: {
+    rpc: jest.fn(() => Promise.resolve({ data: null, error: null })),
     from: jest.fn(() => ({
       select: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
@@ -161,6 +201,19 @@ jest.mock('./src/lib/supabase', () => ({
   },
 }));
 
+// Mock ads config (needs env vars at import time)
+jest.mock('./src/config/ads', () => ({
+  INTERSTITIAL_MIN_GAMES: 2,
+  INTERSTITIAL_MAX_GAMES: 4,
+  FREERUN_GAMES_PER_SESSION: 3,
+  AD_UNIT_IDS: {
+    BANNER: 'ca-app-pub-test/banner',
+    INTERSTITIAL: 'ca-app-pub-test/interstitial',
+    REWARDED: 'ca-app-pub-test/rewarded',
+    HELPER_REWARDED: 'ca-app-pub-test/rewarded-helper',
+  },
+}));
+
 // Mock expo-router
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(() => ({
@@ -174,6 +227,26 @@ jest.mock('expo-router', () => ({
   Stack: {
     Screen: 'Screen',
   },
+}));
+
+// Mock @sentry/react-native
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: jest.fn((component) => component),
+  setUser: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  withScope: jest.fn((callback) => callback({
+    setTag: jest.fn(),
+    setExtras: jest.fn(),
+    setExtra: jest.fn(),
+    setLevel: jest.fn(),
+  })),
+  startInactiveSpan: jest.fn(() => ({
+    end: jest.fn(),
+  })),
+  Severity: { Error: 'error', Warning: 'warning', Info: 'info' },
 }));
 
 // Mock react-native-reanimated

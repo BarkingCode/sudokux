@@ -89,11 +89,4 @@ export const useGameCompletion = ({
  * Utility function to get difficulty for a specific puzzle number.
  * Matches ChaptersScreen logic.
  */
-export const getPuzzleDifficulty = (puzzleNum: number): 'easy' | 'medium' | 'hard' | 'extreme' | 'insane' | 'inhuman' => {
-  if (puzzleNum <= 20) return 'easy';
-  if (puzzleNum <= 40) return 'medium';
-  if (puzzleNum <= 60) return 'hard';
-  if (puzzleNum <= 80) return 'extreme';
-  if (puzzleNum <= 100) return 'insane';
-  return 'inhuman';
-};
+export { getChapterDifficulty as getPuzzleDifficulty } from '../game/chapterPuzzles';

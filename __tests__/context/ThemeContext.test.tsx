@@ -23,12 +23,13 @@ jest.mock('../../src/utils/storage', () => ({
 }));
 
 // Mock useColorScheme
-jest.mock('react-native', () => ({
-  ...jest.requireActual('react-native'),
-  useColorScheme: jest.fn(() => 'light'),
+const mockUseColorScheme = jest.fn(() => 'light');
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
+  __esModule: true,
+  default: mockUseColorScheme,
 }));
 
-import { useColorScheme } from 'react-native';
+const useColorScheme = mockUseColorScheme;
 import { loadData, saveData } from '../../src/utils/storage';
 
 describe('ThemeContext', () => {

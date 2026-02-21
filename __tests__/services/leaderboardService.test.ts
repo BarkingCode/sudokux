@@ -5,22 +5,14 @@
 
 import { leaderboardService, LeaderboardOptions } from '../../src/services/leaderboardService';
 
-// Mock Supabase
+import { supabase } from '../../src/lib/supabase';
+
+// Use the global mock from jest.setup.js and set up chains in beforeEach
 const mockSelect = jest.fn();
 const mockOrder = jest.fn();
 const mockRange = jest.fn();
 const mockEq = jest.fn();
 const mockNot = jest.fn();
-const mockRpc = jest.fn();
-
-jest.mock('../../src/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      select: mockSelect,
-    })),
-    rpc: mockRpc,
-  },
-}));
 
 // Mock Game Center service
 jest.mock('../../src/services/gameCenter', () => ({
@@ -32,10 +24,27 @@ jest.mock('../../src/services/gameCenter', () => ({
 
 import { gameCenterService } from '../../src/services/gameCenter';
 
+// Helper: creates a thenable that also has .eq for optional country chaining
+function makeRangeResult(resolveValue: any) {
+  const promise = Promise.resolve(resolveValue);
+  (promise as any).eq = mockEq;
+  return promise;
+}
+
 describe('leaderboardService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Wire up supabase.from to return our mock chain
+    (supabase.from as jest.Mock).mockImplementation(() => ({
+      select: mockSelect,
+    }));
+    (supabase as any).rpc = jest.fn().mockResolvedValue({ data: 0, error: null });
+
     // Set up default mock chain
+    // The source does: supabase.from(v).select('*').order(...).range(...)
+    // then optionally .eq('country', ...) on the range result
+    // The final result is awaited, so it must be a thenable
     mockSelect.mockReturnValue({
       order: mockOrder,
       eq: mockEq,
@@ -44,21 +53,22 @@ describe('leaderboardService', () => {
     mockOrder.mockReturnValue({
       range: mockRange,
     });
-    mockRange.mockResolvedValue({ data: [], error: null });
-    mockEq.mockReturnValue({
-      order: mockOrder,
+    // Helper to create range result: thenable with .eq for country filter
+    mockRange.mockImplementation(() => makeRangeResult({ data: [], error: null }));
+    // mockEq after range returns a thenable (for country filter path)
+    mockEq.mockImplementation(() => {
+      return Promise.resolve({ data: [], error: null });
     });
     mockNot.mockReturnValue({
       order: mockOrder,
     });
-    mockRpc.mockResolvedValue({ data: 0, error: null });
   });
 
   // ============ getLeaderboard ============
 
   describe('getLeaderboard', () => {
     it('should return empty array when no entries', async () => {
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       const result = await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -84,7 +94,7 @@ describe('leaderboardService', () => {
           rank: 2,
         },
       ];
-      mockRange.mockResolvedValueOnce({ data: mockData, error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: mockData, error: null }));
 
       const result = await leaderboardService.getLeaderboard({
         difficulty: 'medium',
@@ -103,7 +113,7 @@ describe('leaderboardService', () => {
         { user_id: null, nickname: 'Player2', best_time: 200, rank: 2 }, // Missing user_id
         { user_id: 'user-3', nickname: null, best_time: 220, rank: 3 }, // Missing nickname
       ];
-      mockRange.mockResolvedValueOnce({ data: mockData, error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: mockData, error: null }));
 
       const result = await leaderboardService.getLeaderboard({
         difficulty: 'hard',
@@ -114,7 +124,7 @@ describe('leaderboardService', () => {
     });
 
     it('should apply country filter when provided', async () => {
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -125,7 +135,7 @@ describe('leaderboardService', () => {
     });
 
     it('should apply limit and offset', async () => {
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -137,7 +147,7 @@ describe('leaderboardService', () => {
     });
 
     it('should use default limit of 100', async () => {
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -147,7 +157,7 @@ describe('leaderboardService', () => {
     });
 
     it('should return empty array on error', async () => {
-      mockRange.mockResolvedValueOnce({ data: null, error: { message: 'Query failed' } });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: null, error: { message: 'Query failed' } }));
 
       const result = await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -157,7 +167,7 @@ describe('leaderboardService', () => {
     });
 
     it('should return empty array on exception', async () => {
-      mockRange.mockRejectedValueOnce(new Error('Network error'));
+      mockRange.mockImplementationOnce(() => Promise.reject(new Error('Network error')));
 
       const result = await leaderboardService.getLeaderboard({
         difficulty: 'easy',
@@ -171,19 +181,19 @@ describe('leaderboardService', () => {
 
   describe('getUserRank', () => {
     it('should return user rank from RPC call', async () => {
-      mockRpc.mockResolvedValueOnce({ data: 42, error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: 42, error: null });
 
       const result = await leaderboardService.getUserRank('user-123', 'medium');
 
       expect(result).toBe(42);
-      expect(mockRpc).toHaveBeenCalledWith('get_user_rank', {
+      expect((supabase as any).rpc).toHaveBeenCalledWith('get_user_rank', {
         p_user_id: 'user-123',
         p_difficulty: 'medium',
       });
     });
 
     it('should return 0 when user has no rank', async () => {
-      mockRpc.mockResolvedValueOnce({ data: null, error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: null, error: null });
 
       const result = await leaderboardService.getUserRank('user-123', 'easy');
 
@@ -191,7 +201,7 @@ describe('leaderboardService', () => {
     });
 
     it('should return 0 on error', async () => {
-      mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'RPC failed' } });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: null, error: { message: 'RPC failed' } });
 
       const result = await leaderboardService.getUserRank('user-123', 'hard');
 
@@ -199,7 +209,7 @@ describe('leaderboardService', () => {
     });
 
     it('should return 0 on exception', async () => {
-      mockRpc.mockRejectedValueOnce(new Error('Network error'));
+      ((supabase as any).rpc as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       const result = await leaderboardService.getUserRank('user-123', 'extreme');
 
@@ -211,7 +221,7 @@ describe('leaderboardService', () => {
 
   describe('getUserContext', () => {
     it('should return null userEntry and empty nearby when user has no rank', async () => {
-      mockRpc.mockResolvedValueOnce({ data: 0, error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: 0, error: null });
 
       const result = await leaderboardService.getUserContext('user-123', 'easy');
 
@@ -221,7 +231,7 @@ describe('leaderboardService', () => {
 
     it('should return user entry and nearby entries', async () => {
       // getUserRank returns 10
-      mockRpc.mockResolvedValueOnce({ data: 10, error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: 10, error: null });
 
       // getLeaderboard returns nearby entries
       const nearbyEntries = [
@@ -229,7 +239,7 @@ describe('leaderboardService', () => {
         { user_id: 'user-123', nickname: 'TestUser', best_time: 180, rank: 10 },
         { user_id: 'user-15', nickname: 'Player15', best_time: 200, rank: 15 },
       ];
-      mockRange.mockResolvedValueOnce({ data: nearbyEntries, error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: nearbyEntries, error: null }));
 
       const result = await leaderboardService.getUserContext('user-123', 'medium');
 
@@ -239,8 +249,8 @@ describe('leaderboardService', () => {
     });
 
     it('should use default surrounding count of 5', async () => {
-      mockRpc.mockResolvedValueOnce({ data: 10, error: null });
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: 10, error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       await leaderboardService.getUserContext('user-123', 'easy');
 
@@ -250,8 +260,8 @@ describe('leaderboardService', () => {
     });
 
     it('should handle rank near the top (rank 1)', async () => {
-      mockRpc.mockResolvedValueOnce({ data: 1, error: null });
-      mockRange.mockResolvedValueOnce({ data: [], error: null });
+      ((supabase as any).rpc as jest.Mock).mockResolvedValueOnce({ data: 1, error: null });
+      mockRange.mockImplementationOnce(() => makeRangeResult({ data: [], error: null }));
 
       await leaderboardService.getUserContext('user-123', 'easy', 5);
 
@@ -260,7 +270,7 @@ describe('leaderboardService', () => {
     });
 
     it('should return empty on error', async () => {
-      mockRpc.mockRejectedValueOnce(new Error('Error'));
+      ((supabase as any).rpc as jest.Mock).mockRejectedValueOnce(new Error('Error'));
 
       const result = await leaderboardService.getUserContext('user-123', 'easy');
 

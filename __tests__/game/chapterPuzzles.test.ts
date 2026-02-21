@@ -13,39 +13,39 @@ import { GRID_CONFIGS } from '../../src/game/types';
 
 describe('chapterPuzzles', () => {
   describe('getChapterDifficulty', () => {
-    it('should return easy for puzzles 1-20', () => {
+    it('should return easy for puzzles 1-30', () => {
       expect(getChapterDifficulty(1)).toBe('easy');
-      expect(getChapterDifficulty(10)).toBe('easy');
-      expect(getChapterDifficulty(20)).toBe('easy');
+      expect(getChapterDifficulty(15)).toBe('easy');
+      expect(getChapterDifficulty(30)).toBe('easy');
     });
 
-    it('should return medium for puzzles 21-40', () => {
-      expect(getChapterDifficulty(21)).toBe('medium');
-      expect(getChapterDifficulty(30)).toBe('medium');
-      expect(getChapterDifficulty(40)).toBe('medium');
+    it('should return medium for puzzles 31-60', () => {
+      expect(getChapterDifficulty(31)).toBe('medium');
+      expect(getChapterDifficulty(45)).toBe('medium');
+      expect(getChapterDifficulty(60)).toBe('medium');
     });
 
-    it('should return hard for puzzles 41-60', () => {
-      expect(getChapterDifficulty(41)).toBe('hard');
-      expect(getChapterDifficulty(50)).toBe('hard');
-      expect(getChapterDifficulty(60)).toBe('hard');
+    it('should return hard for puzzles 61-90', () => {
+      expect(getChapterDifficulty(61)).toBe('hard');
+      expect(getChapterDifficulty(75)).toBe('hard');
+      expect(getChapterDifficulty(90)).toBe('hard');
     });
 
-    it('should return extreme for puzzles 61-80', () => {
-      expect(getChapterDifficulty(61)).toBe('extreme');
-      expect(getChapterDifficulty(70)).toBe('extreme');
-      expect(getChapterDifficulty(80)).toBe('extreme');
+    it('should return extreme for puzzles 91-120', () => {
+      expect(getChapterDifficulty(91)).toBe('extreme');
+      expect(getChapterDifficulty(105)).toBe('extreme');
+      expect(getChapterDifficulty(120)).toBe('extreme');
     });
 
-    it('should return insane for puzzles 81-100', () => {
-      expect(getChapterDifficulty(81)).toBe('insane');
-      expect(getChapterDifficulty(90)).toBe('insane');
-      expect(getChapterDifficulty(100)).toBe('insane');
+    it('should return insane for puzzles 121-150', () => {
+      expect(getChapterDifficulty(121)).toBe('insane');
+      expect(getChapterDifficulty(135)).toBe('insane');
+      expect(getChapterDifficulty(150)).toBe('insane');
     });
 
-    it('should return inhuman for puzzles beyond 100', () => {
-      expect(getChapterDifficulty(101)).toBe('inhuman');
-      expect(getChapterDifficulty(150)).toBe('inhuman');
+    it('should return inhuman for puzzles beyond 150', () => {
+      expect(getChapterDifficulty(151)).toBe('inhuman');
+      expect(getChapterDifficulty(200)).toBe('inhuman');
       expect(getChapterDifficulty(999)).toBe('inhuman');
     });
   });
@@ -96,8 +96,8 @@ describe('chapterPuzzles', () => {
 
     it('should set the correct difficulty based on puzzle number', () => {
       const puzzleEasy = getChapterPuzzle(5, '9x9');
-      const puzzleMedium = getChapterPuzzle(30, '9x9');
-      const puzzleHard = getChapterPuzzle(50, '9x9');
+      const puzzleMedium = getChapterPuzzle(45, '9x9');
+      const puzzleHard = getChapterPuzzle(75, '9x9');
 
       expect(puzzleEasy.difficulty).toBe('easy');
       expect(puzzleMedium.difficulty).toBe('medium');
@@ -153,15 +153,15 @@ describe('chapterPuzzles', () => {
 
   describe('puzzle uniqueness across difficulty boundaries', () => {
     it('should generate different puzzles at difficulty boundaries', () => {
-      // Test puzzles at difficulty boundaries
-      const puzzle20 = getChapterPuzzle(20, '9x9'); // Last easy
-      const puzzle21 = getChapterPuzzle(21, '9x9'); // First medium
-      const puzzle40 = getChapterPuzzle(40, '9x9'); // Last medium
-      const puzzle41 = getChapterPuzzle(41, '9x9'); // First hard
+      // Test puzzles at difficulty boundaries (30 per level)
+      const puzzle30 = getChapterPuzzle(30, '9x9'); // Last easy
+      const puzzle31 = getChapterPuzzle(31, '9x9'); // First medium
+      const puzzle60 = getChapterPuzzle(60, '9x9'); // Last medium
+      const puzzle61 = getChapterPuzzle(61, '9x9'); // First hard
 
       // Each should be different
-      expect(puzzle20.puzzle).not.toEqual(puzzle21.puzzle);
-      expect(puzzle40.puzzle).not.toEqual(puzzle41.puzzle);
+      expect(puzzle30.puzzle).not.toEqual(puzzle31.puzzle);
+      expect(puzzle60.puzzle).not.toEqual(puzzle61.puzzle);
     });
   });
 });
