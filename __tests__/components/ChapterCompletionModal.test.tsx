@@ -90,7 +90,7 @@ describe('ChapterCompletionModal', () => {
 
   it('displays difficulty badge text', () => {
     const { getByText } = render(<ChapterCompletionModal {...defaultProps} difficulty="medium" />);
-    expect(getByText('medium')).toBeTruthy();
+    expect(getByText('MEDIUM')).toBeTruthy();
   });
 
   it('calls onNextPuzzle when Continue is pressed', () => {

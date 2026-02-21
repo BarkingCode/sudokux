@@ -176,16 +176,16 @@ describe('useGameCompletion', () => {
 describe('getPuzzleDifficulty', () => {
   it.each([
     [1, 'easy'],
-    [20, 'easy'],
-    [21, 'medium'],
-    [40, 'medium'],
-    [41, 'hard'],
-    [60, 'hard'],
-    [61, 'extreme'],
-    [80, 'extreme'],
-    [81, 'insane'],
-    [100, 'insane'],
-    [101, 'inhuman'],
+    [30, 'easy'],
+    [31, 'medium'],
+    [60, 'medium'],
+    [61, 'hard'],
+    [90, 'hard'],
+    [91, 'extreme'],
+    [120, 'extreme'],
+    [121, 'insane'],
+    [150, 'insane'],
+    [151, 'inhuman'],
     [200, 'inhuman'],
   ])('should return %s for puzzle %d', (puzzleNum, expected) => {
     expect(getPuzzleDifficulty(puzzleNum)).toBe(expected);

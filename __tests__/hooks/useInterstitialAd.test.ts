@@ -3,32 +3,36 @@
  * Interstitial ad lifecycle and event handling.
  */
 
-var mockEventListeners = new Map<string, Function>();
-var mockAd = {
-  load: jest.fn(),
-  show: jest.fn(),
-  addAdEventListener: jest.fn((eventType: string, callback: Function) => {
-    mockEventListeners.set(eventType, callback);
-    return jest.fn();
-  }),
-};
-
-jest.mock('react-native-google-mobile-ads', () => ({
-  InterstitialAd: {
-    createForAdRequest: jest.fn(() => mockAd),
-  },
-  AdEventType: {
-    LOADED: 'loaded',
-    ERROR: 'error',
-    CLOSED: 'closed',
-    OPENED: 'opened',
-  },
-  RewardedAdEventType: {
-    LOADED: 'loaded',
-    EARNED_REWARD: 'earned_reward',
-  },
-  TestIds: { INTERSTITIAL: 'test-interstitial' },
-}));
+jest.mock('react-native-google-mobile-ads', () => {
+  const listeners = new Map<string, Function>();
+  const ad = {
+    load: jest.fn(),
+    show: jest.fn(),
+    addAdEventListener: jest.fn((eventType: string, callback: Function) => {
+      listeners.set(eventType, callback);
+      return jest.fn();
+    }),
+    __listeners: listeners,
+  };
+  return {
+    __esModule: true,
+    __mockAd: ad,
+    InterstitialAd: {
+      createForAdRequest: jest.fn(() => ad),
+    },
+    AdEventType: {
+      LOADED: 'loaded',
+      ERROR: 'error',
+      CLOSED: 'closed',
+      OPENED: 'opened',
+    },
+    RewardedAdEventType: {
+      LOADED: 'loaded',
+      EARNED_REWARD: 'earned_reward',
+    },
+    TestIds: { INTERSTITIAL: 'test-interstitial' },
+  };
+});
 
 jest.mock('../../src/utils/platform', () => ({
   isWeb: jest.fn(() => false),
@@ -40,6 +44,12 @@ jest.mock('../../src/services/facebookAnalytics', () => ({
 
 jest.mock('../../src/config/timing', () => ({
   getAdLoadTimeout: jest.fn(() => 10000),
+  TIMING: {
+    AD_TIMEOUTS: {
+      LOAD: 10000,
+      SHOW: 30000,
+    },
+  },
 }));
 
 jest.mock('../../src/utils/logger', () => ({
@@ -59,11 +69,20 @@ import { logAdImpression } from '../../src/services/facebookAnalytics';
 
 const mockIsWeb = isWeb as jest.MockedFunction<typeof isWeb>;
 
+const adsMock = jest.requireMock('react-native-google-mobile-ads');
+const mockAd = adsMock.__mockAd;
+const mockEventListeners: Map<string, Function> = mockAd.__listeners;
+
 describe('useInterstitialAd', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsWeb.mockReturnValue(false);
     mockEventListeners.clear();
+    mockAd.addAdEventListener.mockImplementation((eventType: string, callback: Function) => {
+      mockEventListeners.set(eventType, callback);
+      return jest.fn();
+    });
+    mockAd.show.mockResolvedValue(undefined);
   });
 
   // ============ Loading ============

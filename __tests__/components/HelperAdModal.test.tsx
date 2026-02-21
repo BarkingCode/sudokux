@@ -96,7 +96,7 @@ describe('HelperAdModal', () => {
   it('calls onClose when cancel button is pressed', () => {
     const onClose = jest.fn();
     const { getByText } = render(<HelperAdModal {...defaultProps} onClose={onClose} />);
-    fireEvent.press(getByText('NOT NOW'));
+    fireEvent.press(getByText('MAYBE LATER'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

@@ -19,7 +19,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npm test -- --ci --coverage --maxWorkers=4 --forceExit --detectOpenHandles
+      - run: npm test -- --ci --coverage --maxWorkers=2 --forceExit --detectOpenHandles
         timeout-minutes: 10
 
       - name: Upload coverage
