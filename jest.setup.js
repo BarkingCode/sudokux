@@ -176,6 +176,26 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+// Mock @sentry/react-native
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: jest.fn((component) => component),
+  setUser: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  withScope: jest.fn((callback) => callback({
+    setTag: jest.fn(),
+    setExtras: jest.fn(),
+    setExtra: jest.fn(),
+    setLevel: jest.fn(),
+  })),
+  startInactiveSpan: jest.fn(() => ({
+    end: jest.fn(),
+  })),
+  Severity: { Error: 'error', Warning: 'warning', Info: 'info' },
+}));
+
 // Mock react-native-reanimated
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');

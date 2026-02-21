@@ -21,12 +21,36 @@ import { initializeFacebookSDK } from '../src/services/facebookAnalytics';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  tracesSampleRate: 1.0,
+  environment: __DEV__ ? 'development' : 'production',
+  enableNativeNdk: false,
+  tracesSampleRate: __DEV__ ? 1.0 : 0.2,
   _experiments: {
-    profilesSampleRate: 1.0,
+    profilesSampleRate: __DEV__ ? 1.0 : 0.1,
   },
   enableAutoSessionTracking: true,
+  enableAutoPerformanceTracing: true,
   attachScreenshot: true,
+  debug: __DEV__,
+  beforeSend(event, hint) {
+    // Filter out known noise
+    const error = hint?.originalException;
+    
+    if (error && typeof error === 'object' && 'message' in error) {
+      const message = String(error.message);
+      
+      // Filter out React Native animation warnings
+      if (message.includes('Animated') || message.includes('componentWillReceiveProps')) {
+        return null;
+      }
+      
+      // Filter out network timeouts during development
+      if (__DEV__ && message.includes('timeout')) {
+        return null;
+      }
+    }
+    
+    return event;
+  },
 });
 
 function NotificationHandler() {
