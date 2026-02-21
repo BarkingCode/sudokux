@@ -26,7 +26,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { useGame, Difficulty, SavedPuzzleWithProgress } from '../../src/context/GameContext';
 import { loadData, saveData, loadSecureData, STORAGE_KEYS } from '../../src/utils/storage';
 import { chapterService, ChapterInProgress } from '../../src/services/chapterService';
-import { getChapterPuzzle } from '../../src/game/chapterPuzzles';
+import { getChapterPuzzle, getChapterDifficulty as getPuzzleDifficulty } from '../../src/game/chapterPuzzles';
 import type { ChapterCompletion } from '../../src/lib/database.types';
 import type { GridType } from '../../src/game/types';
 
@@ -43,20 +43,6 @@ const PUZZALS_TO_ADD = 20;
 const NODE_SIZE = 50;
 const DOT_SIZE = 6;
 const DOTS_BETWEEN = 4;
-
-/**
- * Get difficulty for a specific puzzle number.
- * Difficulty increases as puzzles progress.
- * 30 puzzles per difficulty level.
- */
-const getPuzzleDifficulty = (puzzleNum: number): Difficulty => {
-  if (puzzleNum <= 30) return 'easy';
-  if (puzzleNum <= 60) return 'medium';
-  if (puzzleNum <= 90) return 'hard';
-  if (puzzleNum <= 120) return 'extreme';
-  if (puzzleNum <= 150) return 'insane';
-  return 'inhuman';
-};
 
 /**
  * Get difficulty label color
