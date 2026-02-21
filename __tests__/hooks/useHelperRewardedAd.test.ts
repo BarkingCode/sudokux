@@ -3,8 +3,8 @@
  * Helper-specific rewarded ad - does NOT grant free-run games.
  */
 
-const mockEventListeners = new Map<string, Function>();
-const mockAd = {
+var mockEventListeners = new Map<string, Function>();
+var mockAd = {
   load: jest.fn(),
   show: jest.fn(),
   addAdEventListener: jest.fn((eventType: string, callback: Function) => {

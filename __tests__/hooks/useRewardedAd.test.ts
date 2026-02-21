@@ -3,9 +3,9 @@
  * Rewarded ad lifecycle with EARNED_REWARD handling.
  */
 
-// Shared mock ad — variables starting with 'mock' are allowed in jest.mock factories
-const mockEventListeners = new Map<string, Function>();
-const mockAd = {
+// Must use var (not const/let) for jest.mock hoisting to work
+var mockEventListeners = new Map<string, Function>();
+var mockAd = {
   load: jest.fn(),
   show: jest.fn(),
   addAdEventListener: jest.fn((eventType: string, callback: Function) => {
